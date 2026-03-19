@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 
 @Generated(
     value = "org.mapstruct.ap.MappingProcessor",
-    date = "2026-03-19T14:43:08+0200",
+    date = "2026-03-19T18:14:04+0200",
     comments = "version: 1.6.3, compiler: IncrementalProcessingEnvironment from gradle-language-java-9.3.1.jar, environment: Java 21.0.7 (Homebrew)"
 )
 @Component
@@ -35,6 +35,12 @@ public class TransactionMapperImpl implements TransactionMapper {
         transactionResponse.setDescription( transaction.getDescription() );
         transactionResponse.setCreatedAt( transaction.getCreatedAt() );
         transactionResponse.setUpdatedAt( transaction.getUpdatedAt() );
+
+        transactionResponse.setCategoryName( transaction.getCategory() != null ? transaction.getCategory().getName() : null );
+        transactionResponse.setParentCategoryId( transaction.getCategory() != null && transaction.getCategory().getParent() != null ? transaction.getCategory().getParent().getId() : null );
+        transactionResponse.setParentCategoryName( transaction.getCategory() != null && transaction.getCategory().getParent() != null ? transaction.getCategory().getParent().getName() : null );
+        transactionResponse.setSubCategoryId( transaction.getCategory() != null && transaction.getCategory().getParent() != null ? transaction.getCategory().getId() : null );
+        transactionResponse.setSubCategoryName( transaction.getCategory() != null && transaction.getCategory().getParent() != null ? transaction.getCategory().getName() : null );
 
         return transactionResponse;
     }
