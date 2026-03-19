@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
+import { parentGuard } from './core/guards/parent.guard';
 
 export const routes: Routes = [
   {
@@ -46,6 +47,11 @@ export const routes: Routes = [
         path: 'notifications',
         loadComponent: () =>
           import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent)
+      },
+      {
+        path: 'overview',
+        canActivate: [parentGuard],
+        loadComponent: () => import('./features/overview/overview.component').then((m) => m.OverviewComponent)
       },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]

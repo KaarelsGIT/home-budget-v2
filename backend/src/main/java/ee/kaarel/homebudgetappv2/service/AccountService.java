@@ -2,6 +2,7 @@ package ee.kaarel.homebudgetappv2.service;
 
 import ee.kaarel.homebudgetappv2.dto.AccountRequest;
 import ee.kaarel.homebudgetappv2.dto.AccountResponse;
+import ee.kaarel.homebudgetappv2.dto.TransferTargetResponse;
 import ee.kaarel.homebudgetappv2.mapper.AccountMapper;
 import ee.kaarel.homebudgetappv2.model.Account;
 import ee.kaarel.homebudgetappv2.model.User;
@@ -28,6 +29,27 @@ public class AccountService {
         return accountRepository.findByUserIdIn(userAccessService.getAccessibleUserIds())
                 .stream()
                 .map(accountMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<AccountResponse> getMyAccounts() {
+        Long currentUserId = userAccessService.getCurrentUser().getId();
+        return accountRepository.findByUserIdIn(List.of(currentUserId))
+                .stream()
+                .map(accountMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TransferTargetResponse> getTransferTargets() {
+        Long currentUserId = userAccessService.getCurrentUser().getId();
+        return accountRepository.findByUserIdNot(currentUserId)
+                .stream()
+                .map(account -> new TransferTargetResponse(
+                        account.getId(),
+                        account.getName()
+                ))
                 .toList();
     }
 

@@ -15,7 +15,7 @@ import { TransactionService } from '../../core/services/transaction.service';
 import { AccountService } from '../../core/services/account.service';
 import { CategoryService } from '../../core/services/category.service';
 import { NotificationService } from '../../core/services/notification.service';
-import { Account } from '../../core/models/account.model';
+import { Account, TransferTarget } from '../../core/models/account.model';
 import { CategoryTreeNode } from '../../core/models/category.model';
 import { Transaction, TransactionRequest, TransactionType } from '../../core/models/transaction.model';
 import { SignedAmountPipe } from '../../shared/pipes/signed-amount.pipe';
@@ -51,6 +51,34 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
       display: flex;
       gap: 8px;
       margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .category-cell {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .category-header {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-weight: 600;
+      color: #24415f;
+      width: fit-content;
+      justify-content: flex-start;
+      padding-left: 0;
+    }
+
+    .subcategory {
+      font-size: 0.85rem;
+      color: #5b6f86;
+      margin-left: 28px;
+      padding: 4px 8px;
+      background: #edf4ff;
+      border-radius: 10px;
+      width: fit-content;
     }
 
     @media (max-width: 980px) {
@@ -132,6 +160,25 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
             <td mat-cell *matCellDef="let row">{{ row.type }}</td>
           </ng-container>
 
+          <ng-container matColumnDef="category">
+            <th mat-header-cell *matHeaderCellDef>Category</th>
+            <td mat-cell *matCellDef="let row">
+              <div class="category-cell">
+                @if (row.parentCategoryName && row.subCategoryName) {
+                  <button mat-button class="category-header" (click)="toggleCategory(row.id)">
+                    <mat-icon>{{ expandedCategoryRowId() === row.id ? 'expand_less' : 'expand_more' }}</mat-icon>
+                    {{ row.parentCategoryName }}
+                  </button>
+                  @if (expandedCategoryRowId() === row.id) {
+                    <div class="subcategory">{{ row.subCategoryName }}</div>
+                  }
+                } @else {
+                  <span>{{ row.categoryName || '-' }}</span>
+                }
+              </div>
+            </td>
+          </ng-container>
+
           <ng-container matColumnDef="amount">
             <th mat-header-cell *matHeaderCellDef>Amount</th>
             <td mat-cell *matCellDef="let row">{{ row.amount | signedAmount : row.type }}</td>
@@ -145,10 +192,10 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let row">
-              <button mat-icon-button (click)="openEditDialog(row)">
+              <button mat-icon-button aria-label="Edit transaction" (click)="openEditDialog(row)">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button color="warn" (click)="deleteTransaction(row)">
+              <button mat-icon-button color="warn" aria-label="Delete transaction" (click)="deleteTransaction(row)">
                 <mat-icon>delete</mat-icon>
               </button>
             </td>
@@ -170,12 +217,16 @@ export class TransactionsComponent {
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly displayedColumns = ['date', 'type', 'amount', 'description', 'actions'];
+  readonly displayedColumns = ['date', 'type', 'category', 'amount', 'description', 'actions'];
   readonly types: TransactionType[] = ['INCOME', 'EXPENSE', 'TRANSFER'];
   readonly transactions = signal<Transaction[]>([]);
   readonly accounts = signal<Account[]>([]);
-  readonly categoryTree = signal<CategoryTreeNode[]>([]);
+  readonly myAccounts = signal<Account[]>([]);
+  readonly transferTargets = signal<TransferTarget[]>([]);
+  readonly incomeCategoryTree = signal<CategoryTreeNode[]>([]);
+  readonly expenseCategoryTree = signal<CategoryTreeNode[]>([]);
   readonly flatCategories = signal<Array<{ id: number; label: string }>>([]);
+  readonly expandedCategoryRowId = signal<number | null>(null);
 
   readonly filterForm = this.fb.group({
     startDate: [''],
@@ -195,12 +246,18 @@ export class TransactionsComponent {
     forkJoin({
       transactions: this.transactionService.getTransactions(),
       accounts: this.accountService.getAccounts(),
-      categories: this.categoryService.getCategoryTree()
-    }).subscribe(({ transactions, accounts, categories }) => {
+      myAccounts: this.accountService.getMyAccounts(),
+      transferTargets: this.accountService.getTransferTargets(),
+      incomeCategories: this.categoryService.getCategoryTreeByType('INCOME'),
+      expenseCategories: this.categoryService.getCategoryTreeByType('EXPENSE')
+    }).subscribe(({ transactions, accounts, myAccounts, transferTargets, incomeCategories, expenseCategories }) => {
       this.transactions.set(transactions);
       this.accounts.set(accounts);
-      this.categoryTree.set(categories);
-      this.flatCategories.set(this.flattenCategories(categories));
+      this.myAccounts.set(myAccounts);
+      this.transferTargets.set(transferTargets);
+      this.incomeCategoryTree.set(incomeCategories);
+      this.expenseCategoryTree.set(expenseCategories);
+      this.flatCategories.set(this.flattenCategories([...incomeCategories, ...expenseCategories]));
     });
   }
 
@@ -213,6 +270,10 @@ export class TransactionsComponent {
     });
 
     return rows;
+  }
+
+  toggleCategory(transactionId: number): void {
+    this.expandedCategoryRowId.set(this.expandedCategoryRowId() === transactionId ? null : transactionId);
   }
 
   applyFilters(): void {
@@ -247,7 +308,13 @@ export class TransactionsComponent {
 
   openCreateDialog(): void {
     const ref = this.dialog.open(TransactionFormDialogComponent, {
-      data: { transaction: null, accounts: this.accounts(), categories: this.categoryTree() },
+      data: {
+        transaction: null,
+        myAccounts: this.myAccounts(),
+        transferTargets: this.transferTargets(),
+        incomeCategories: this.incomeCategoryTree(),
+        expenseCategories: this.expenseCategoryTree()
+      },
       width: '620px'
     });
 
@@ -261,14 +328,20 @@ export class TransactionsComponent {
         if (payload.type === 'TRANSFER') {
           this.handleTransferNotification();
         }
-        this.applyFilters();
+        this.loadDependencies();
       });
     });
   }
 
   openEditDialog(transaction: Transaction): void {
     const ref = this.dialog.open(TransactionFormDialogComponent, {
-      data: { transaction, accounts: this.accounts(), categories: this.categoryTree() },
+      data: {
+        transaction,
+        myAccounts: this.myAccounts(),
+        transferTargets: this.transferTargets(),
+        incomeCategories: this.incomeCategoryTree(),
+        expenseCategories: this.expenseCategoryTree()
+      },
       width: '620px'
     });
 
@@ -279,7 +352,7 @@ export class TransactionsComponent {
 
       this.transactionService.updateTransaction(transaction.id, payload).subscribe(() => {
         this.snackBar.open('Transaction updated', 'Close', { duration: 2500 });
-        this.applyFilters();
+        this.loadDependencies();
       });
     });
   }
@@ -299,14 +372,12 @@ export class TransactionsComponent {
 
       this.transactionService.deleteTransaction(transaction.id).subscribe(() => {
         this.snackBar.open('Transaction deleted', 'Close', { duration: 2500 });
-        this.applyFilters();
+        this.loadDependencies();
       });
     });
   }
 
   private handleTransferNotification(): void {
-    this.snackBar.open('Transfer completed successfully', 'Close', { duration: 3000 });
-
     this.notificationService.getNotifications().subscribe((notifications) => {
       const incomingTransferNotification = notifications.find(
         (notification) => !notification.read && notification.message.toLowerCase().includes('transfer')

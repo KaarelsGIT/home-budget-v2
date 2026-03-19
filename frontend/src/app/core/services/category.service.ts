@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { map, Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Category, CategoryRequest, CategoryTreeNode } from '../models/category.model';
+import { Category, CategoryRequest, CategoryTreeNode, CategoryType } from '../models/category.model';
 
 @Injectable({ providedIn: 'root' })
 export class CategoryService {
@@ -12,6 +12,11 @@ export class CategoryService {
 
   getCategories(): Observable<Category[]> {
     return this.http.get<Category[]>(this.baseUrl);
+  }
+
+  getCategoriesByType(type: CategoryType): Observable<Category[]> {
+    const params = new HttpParams().set('type', type);
+    return this.http.get<Category[]>(`${environment.apiBaseUrl}/api/categories`, { params });
   }
 
   getCategoryById(id: number): Observable<Category> {
@@ -32,6 +37,10 @@ export class CategoryService {
 
   getCategoryTree(): Observable<CategoryTreeNode[]> {
     return this.getCategories().pipe(map((categories) => this.buildTree(categories)));
+  }
+
+  getCategoryTreeByType(type: CategoryType): Observable<CategoryTreeNode[]> {
+    return this.getCategoriesByType(type).pipe(map((categories) => this.buildTree(categories)));
   }
 
   private buildTree(categories: Category[]): CategoryTreeNode[] {

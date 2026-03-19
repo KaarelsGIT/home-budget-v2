@@ -5,7 +5,7 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
-import { Category } from '../../core/models/category.model';
+import { Category, CategoryType } from '../../core/models/category.model';
 
 export interface CategoryDialogData {
   category: Category | null;
@@ -36,6 +36,15 @@ export interface CategoryDialogData {
         </mat-form-field>
 
         <mat-form-field>
+          <mat-label>Type</mat-label>
+          <mat-select formControlName="type" (valueChange)="form.get('parentId')?.setValue(null)">
+            @for (type of types; track type) {
+              <mat-option [value]="type">{{ type }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field>
           <mat-label>Parent Category</mat-label>
           <mat-select formControlName="parentId">
             <mat-option [value]="null">None</mat-option>
@@ -57,12 +66,18 @@ export class CategoryFormDialogComponent {
   private readonly dialogRef = inject(MatDialogRef<CategoryFormDialogComponent>);
   readonly data = inject<CategoryDialogData>(MAT_DIALOG_DATA);
 
+  readonly types: CategoryType[] = ['INCOME', 'EXPENSE'];
+
   get availableParents(): Category[] {
-    return this.data.categories.filter((category) => category.id !== this.data.category?.id);
+    const selectedType = this.form.get('type')?.value;
+    return this.data.categories.filter(
+      (category) => category.id !== this.data.category?.id && category.type === selectedType
+    );
   }
 
   readonly form = this.fb.group({
     name: [this.data.category?.name ?? '', [Validators.required]],
+    type: [this.data.category?.type ?? ('EXPENSE' as CategoryType), [Validators.required]],
     parentId: [this.data.category?.parentId ?? null]
   });
 

@@ -67,7 +67,7 @@ import { AuthService } from '../../core/services/auth.service';
     <mat-sidenav-container class="shell">
       <mat-sidenav [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile()">
         <mat-nav-list>
-          @for (item of navItems; track item.path) {
+          @for (item of navItems(); track item.path) {
             <a mat-list-item [routerLink]="item.path" routerLinkActive="active-link">{{ item.label }}</a>
           }
         </mat-nav-list>
@@ -82,14 +82,22 @@ import { AuthService } from '../../core/services/auth.service';
   `
 })
 export class LayoutShellComponent {
-  readonly navItems = [
-    { path: '/dashboard', label: 'Dashboard' },
-    { path: '/accounts', label: 'Accounts' },
-    { path: '/transactions', label: 'Transactions' },
-    { path: '/categories', label: 'Categories' },
-    { path: '/recurring', label: 'Recurring' },
-    { path: '/notifications', label: 'Notifications' }
-  ];
+  readonly navItems = computed(() => {
+    const items = [
+      { path: '/dashboard', label: 'Dashboard' },
+      { path: '/accounts', label: 'Accounts' },
+      { path: '/transactions', label: 'Transactions' },
+      { path: '/categories', label: 'Categories' },
+      { path: '/recurring', label: 'Recurring' },
+      { path: '/notifications', label: 'Notifications' }
+    ];
+
+    if (this.authService.currentUser()?.role === 'PARENT') {
+      items.push({ path: '/overview', label: 'Family Overview' });
+    }
+
+    return items;
+  });
 
   private readonly isMobileSignal = signal(false);
   readonly isMobile = this.isMobileSignal.asReadonly();

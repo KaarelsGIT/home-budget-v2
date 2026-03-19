@@ -2,6 +2,8 @@ package ee.kaarel.homebudgetappv2.service;
 
 import ee.kaarel.homebudgetappv2.dto.TransactionRequest;
 import ee.kaarel.homebudgetappv2.dto.TransactionResponse;
+import ee.kaarel.homebudgetappv2.dto.TransferRequest;
+import ee.kaarel.homebudgetappv2.dto.TransferResponse;
 import ee.kaarel.homebudgetappv2.mapper.TransactionMapper;
 import ee.kaarel.homebudgetappv2.model.*;
 import ee.kaarel.homebudgetappv2.repository.AccountRepository;
@@ -18,6 +20,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
+import static org.springframework.http.HttpStatus.FORBIDDEN;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -72,6 +75,35 @@ public class TransactionService {
     }
 
     @Transactional
+    public TransferResponse transfer(TransferRequest request) {
+        User currentUser = userAccessService.getCurrentUser();
+
+        TransactionRequest transferRequest = new TransactionRequest();
+        transferRequest.setType(TransactionType.TRANSFER);
+        transferRequest.setAmount(request.getAmount());
+        transferRequest.setDate(request.getDate());
+        transferRequest.setDescription(request.getDescription());
+        transferRequest.setFromAccountId(request.getFromAccountId());
+        transferRequest.setToAccountId(request.getToAccountId());
+
+        Transaction transaction = new Transaction();
+        transaction.setUser(currentUser);
+        applyRequestToTransaction(transaction, transferRequest, currentUser);
+
+        Transaction saved = transactionRepository.save(transaction);
+        Account fromAccount = saved.getFromAccount();
+        Account toAccount = saved.getToAccount();
+
+        return new TransferResponse(
+                saved.getId(),
+                fromAccount.getId(),
+                fromAccount.getBalance(),
+                toAccount.getId(),
+                toAccount.getName()
+        );
+    }
+
+    @Transactional
     public void delete(Long id) {
         Transaction transaction = transactionRepository.findByIdAndUserIdIn(id, userAccessService.getAccessibleUserIds())
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Transaction not found"));
@@ -107,13 +139,17 @@ public class TransactionService {
     private void applyRequestToTransaction(Transaction transaction, TransactionRequest request, User owner) {
         validateTypeAccounts(request);
 
-        Category category = request.getCategoryId() == null ? null : categoryService.getAccessibleCategoryOrThrow(request.getCategoryId());
+        Category category = resolveCategoryForTransaction(request);
         if (category != null && !category.getUser().getId().equals(owner.getId())) {
             throw new ResponseStatusException(BAD_REQUEST, "Category must belong to transaction owner");
         }
 
         Account fromAccount = request.getFromAccountId() == null ? null : getAccessibleAccount(request.getFromAccountId());
-        Account toAccount = request.getToAccountId() == null ? null : getAccessibleAccount(request.getToAccountId());
+        Account toAccount = request.getToAccountId() == null
+                ? null
+                : (request.getType() == TransactionType.TRANSFER
+                ? getTransferTargetAccount(request.getToAccountId())
+                : getAccessibleAccount(request.getToAccountId()));
 
         if (fromAccount != null && !fromAccount.getUser().getId().equals(owner.getId())) {
             throw new ResponseStatusException(BAD_REQUEST, "fromAccount must belong to transaction owner");
@@ -121,6 +157,12 @@ public class TransactionService {
 
         if (request.getType() != TransactionType.TRANSFER && toAccount != null && !toAccount.getUser().getId().equals(owner.getId())) {
             throw new ResponseStatusException(BAD_REQUEST, "toAccount must belong to transaction owner for non-transfer types");
+        }
+        if (request.getType() == TransactionType.TRANSFER && !fromAccount.getUser().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(FORBIDDEN, "You can transfer only from your own account");
+        }
+        if (request.getType() == TransactionType.TRANSFER && toAccount.getUser().getId().equals(owner.getId())) {
+            throw new ResponseStatusException(BAD_REQUEST, "Transfer target must belong to another user");
         }
 
         transaction.setType(request.getType());
@@ -134,9 +176,46 @@ public class TransactionService {
         applyBalanceImpact(transaction);
     }
 
+    private Category resolveCategoryForTransaction(TransactionRequest request) {
+        if (request.getType() == TransactionType.TRANSFER) {
+            return null;
+        }
+
+        if (request.getSubCategoryId() != null) {
+            Category subCategory = categoryService.getAccessibleCategoryOrThrow(request.getSubCategoryId());
+            if (subCategory.getParent() == null) {
+                throw new ResponseStatusException(BAD_REQUEST, "subCategoryId must reference a child category");
+            }
+            if (request.getParentCategoryId() != null
+                    && !request.getParentCategoryId().equals(subCategory.getParent().getId())) {
+                throw new ResponseStatusException(BAD_REQUEST, "subCategoryId does not belong to parentCategoryId");
+            }
+            return subCategory;
+        }
+
+        if (request.getParentCategoryId() != null) {
+            Category parentCategory = categoryService.getAccessibleCategoryOrThrow(request.getParentCategoryId());
+            if (parentCategory.getParent() != null) {
+                throw new ResponseStatusException(BAD_REQUEST, "parentCategoryId must reference a root category");
+            }
+            return parentCategory;
+        }
+
+        if (request.getCategoryId() != null) {
+            return categoryService.getAccessibleCategoryOrThrow(request.getCategoryId());
+        }
+
+        throw new ResponseStatusException(BAD_REQUEST, "Category is required for INCOME and EXPENSE");
+    }
+
     private Account getAccessibleAccount(Long accountId) {
         return accountRepository.findByIdAndUserIdIn(accountId, userAccessService.getAccessibleUserIds())
                 .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Account not found"));
+    }
+
+    private Account getTransferTargetAccount(Long accountId) {
+        return accountRepository.findById(accountId)
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Transfer target account not found"));
     }
 
     private void validateTypeAccounts(TransactionRequest request) {

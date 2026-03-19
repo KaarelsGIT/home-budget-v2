@@ -2,6 +2,7 @@ package ee.kaarel.homebudgetappv2.controller;
 
 import ee.kaarel.homebudgetappv2.dto.CategoryRequest;
 import ee.kaarel.homebudgetappv2.dto.CategoryResponse;
+import ee.kaarel.homebudgetappv2.model.CategoryType;
 import ee.kaarel.homebudgetappv2.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -11,15 +12,18 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping("/categories")
+@RequestMapping({"/categories", "/api/categories"})
 @RequiredArgsConstructor
 public class CategoryController {
 
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<List<CategoryResponse>> getAll() {
-        return ResponseEntity.ok(categoryService.getAll());
+    public ResponseEntity<List<CategoryResponse>> getAll(@RequestParam(required = false) CategoryType type) {
+        if (type == null) {
+            return ResponseEntity.ok(categoryService.getAll());
+        }
+        return ResponseEntity.ok(categoryService.getAllByType(type));
     }
 
     @GetMapping("/{id}")

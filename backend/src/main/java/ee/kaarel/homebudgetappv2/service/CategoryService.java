@@ -4,6 +4,7 @@ import ee.kaarel.homebudgetappv2.dto.CategoryRequest;
 import ee.kaarel.homebudgetappv2.dto.CategoryResponse;
 import ee.kaarel.homebudgetappv2.mapper.CategoryMapper;
 import ee.kaarel.homebudgetappv2.model.Category;
+import ee.kaarel.homebudgetappv2.model.CategoryType;
 import ee.kaarel.homebudgetappv2.model.User;
 import ee.kaarel.homebudgetappv2.repository.CategoryRepository;
 import lombok.RequiredArgsConstructor;
@@ -33,6 +34,14 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
+    public List<CategoryResponse> getAllByType(CategoryType type) {
+        return categoryRepository.findByUserIdInAndType(userAccessService.getAccessibleUserIds(), type)
+                .stream()
+                .map(categoryMapper::toResponse)
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public CategoryResponse getById(Long id) {
         Category category = getAccessibleCategoryOrThrow(id);
         return categoryMapper.toResponse(category);
@@ -44,12 +53,16 @@ public class CategoryService {
 
         Category category = new Category();
         category.setName(request.getName());
+        category.setType(request.getType());
         category.setUser(targetUser);
 
         if (request.getParentId() != null) {
             Category parent = getAccessibleCategoryOrThrow(request.getParentId());
             if (!parent.getUser().getId().equals(targetUser.getId())) {
                 throw new ResponseStatusException(BAD_REQUEST, "Parent category must belong to the same user");
+            }
+            if (parent.getType() != request.getType()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Parent category type must match child category type");
             }
             category.setParent(parent);
         }
@@ -61,6 +74,7 @@ public class CategoryService {
     public CategoryResponse update(Long id, CategoryRequest request) {
         Category category = getAccessibleCategoryOrThrow(id);
         category.setName(request.getName());
+        category.setType(request.getType());
 
         if (request.getParentId() != null) {
             if (request.getParentId().equals(id)) {
@@ -69,6 +83,9 @@ public class CategoryService {
             Category parent = getAccessibleCategoryOrThrow(request.getParentId());
             if (!parent.getUser().getId().equals(category.getUser().getId())) {
                 throw new ResponseStatusException(BAD_REQUEST, "Parent category must belong to the same user");
+            }
+            if (parent.getType() != request.getType()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Parent category type must match child category type");
             }
             category.setParent(parent);
         } else {

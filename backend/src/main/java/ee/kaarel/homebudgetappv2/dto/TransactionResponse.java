@@ -18,6 +18,11 @@ public class TransactionResponse {
     private String description;
     private Long userId;
     private Long categoryId;
+    private String categoryName;
+    private Long parentCategoryId;
+    private String parentCategoryName;
+    private Long subCategoryId;
+    private String subCategoryName;
     private Long fromAccountId;
     private Long toAccountId;
     private LocalDateTime createdAt;

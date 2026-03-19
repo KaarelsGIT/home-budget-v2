@@ -2,6 +2,8 @@ package ee.kaarel.homebudgetappv2.controller;
 
 import ee.kaarel.homebudgetappv2.dto.TransactionRequest;
 import ee.kaarel.homebudgetappv2.dto.TransactionResponse;
+import ee.kaarel.homebudgetappv2.dto.TransferRequest;
+import ee.kaarel.homebudgetappv2.dto.TransferResponse;
 import ee.kaarel.homebudgetappv2.model.TransactionType;
 import ee.kaarel.homebudgetappv2.service.TransactionService;
 import jakarta.validation.Valid;
@@ -14,7 +16,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping("/transactions")
+@RequestMapping({"/transactions", "/api/transactions"})
 @RequiredArgsConstructor
 public class TransactionController {
 
@@ -39,6 +41,11 @@ public class TransactionController {
     @PutMapping("/{id}")
     public ResponseEntity<TransactionResponse> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
         return ResponseEntity.ok(transactionService.update(id, request));
+    }
+
+    @PostMapping("/transfer")
+    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
+        return ResponseEntity.ok(transactionService.transfer(request));
     }
 
     @DeleteMapping("/{id}")

@@ -11,3 +11,8 @@ export interface AccountRequest {
   balance: number;
   currency: string;
 }
+
+export interface TransferTarget {
+  id: number;
+  name: string;
+}
