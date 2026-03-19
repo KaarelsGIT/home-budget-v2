@@ -1,0 +1,34 @@
+# macOS
+.DS_Store
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Logs
+*.log
+logs/
+
+# Environment files
+.env
+.env.*
+
+# Frontend (Angular)
+frontend/node_modules/
+frontend/.angular/
+frontend/dist/
+frontend/coverage/
+frontend/.cache/
+
+# Backend (Spring Boot / Gradle)
+backend/.gradle/
+backend/build/
+backend/out/
+
+# Java
+*.class
+
+# Temporary files
+*.tmp
+*.swp
