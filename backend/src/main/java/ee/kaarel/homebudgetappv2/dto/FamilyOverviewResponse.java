@@ -13,5 +13,5 @@ public class FamilyOverviewResponse {
     private OverviewTotals totals;
     private List<OverviewMonthlyItem> monthly;
     private List<OverviewCategoryItem> categories;
-    private List<TransactionResponse> transactions;
+    private List<TransactionDTO> transactions;
 }

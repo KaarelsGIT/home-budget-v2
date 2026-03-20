@@ -9,7 +9,6 @@ import { Category, CategoryType } from '../../core/models/category.model';
 
 export interface CategoryDialogData {
   category: Category | null;
-  categories: Category[];
 }
 
 @Component({
@@ -37,19 +36,9 @@ export interface CategoryDialogData {
 
         <mat-form-field>
           <mat-label>Type</mat-label>
-          <mat-select formControlName="type" (valueChange)="form.get('parentId')?.setValue(null)">
+          <mat-select formControlName="type">
             @for (type of types; track type) {
               <mat-option [value]="type">{{ type }}</mat-option>
-            }
-          </mat-select>
-        </mat-form-field>
-
-        <mat-form-field>
-          <mat-label>Parent Category</mat-label>
-          <mat-select formControlName="parentId">
-            <mat-option [value]="null">None</mat-option>
-            @for (category of availableParents; track category.id) {
-              <mat-option [value]="category.id">{{ category.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -68,17 +57,9 @@ export class CategoryFormDialogComponent {
 
   readonly types: CategoryType[] = ['INCOME', 'EXPENSE'];
 
-  get availableParents(): Category[] {
-    const selectedType = this.form.get('type')?.value;
-    return this.data.categories.filter(
-      (category) => category.id !== this.data.category?.id && category.type === selectedType
-    );
-  }
-
   readonly form = this.fb.group({
     name: [this.data.category?.name ?? '', [Validators.required]],
-    type: [this.data.category?.type ?? ('EXPENSE' as CategoryType), [Validators.required]],
-    parentId: [this.data.category?.parentId ?? null]
+    type: [this.data.category?.type ?? ('EXPENSE' as CategoryType), [Validators.required]]
   });
 
   save(): void {

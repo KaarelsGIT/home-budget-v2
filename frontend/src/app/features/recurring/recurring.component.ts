@@ -11,7 +11,7 @@ import { AccountService } from '../../core/services/account.service';
 import { CategoryService } from '../../core/services/category.service';
 import { RecurringService } from '../../core/services/recurring.service';
 import { Account } from '../../core/models/account.model';
-import { CategoryTreeNode } from '../../core/models/category.model';
+import { Category } from '../../core/models/category.model';
 import { RecurringTransaction, RecurringTransactionRequest } from '../../core/models/recurring.model';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { RecurringFormDialogComponent } from './recurring-form-dialog.component';
@@ -73,7 +73,7 @@ export class RecurringComponent {
   readonly recurring = signal<RecurringTransaction[]>([]);
   readonly upcoming = signal<RecurringTransaction[]>([]);
   readonly accounts = signal<Account[]>([]);
-  readonly categories = signal<CategoryTreeNode[]>([]);
+  readonly categories = signal<Category[]>([]);
 
   constructor(
     private readonly recurringService: RecurringService,
@@ -90,7 +90,7 @@ export class RecurringComponent {
       recurring: this.recurringService.getRecurring(),
       upcoming: this.recurringService.getUpcomingRecurring(),
       accounts: this.accountService.getAccounts(),
-      categories: this.categoryService.getCategoryTree()
+      categories: this.categoryService.getCategories()
     }).subscribe(({ recurring, upcoming, accounts, categories }) => {
       this.recurring.set(recurring);
       this.upcoming.set(upcoming);

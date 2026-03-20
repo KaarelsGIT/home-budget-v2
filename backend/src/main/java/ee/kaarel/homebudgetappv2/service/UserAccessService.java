@@ -33,15 +33,19 @@ public class UserAccessService {
     }
 
     public List<Long> getAccessibleUserIds() {
+        return getAccessibleUsers().stream().map(User::getId).toList();
+    }
+
+    public List<User> getAccessibleUsers() {
         User current = getCurrentUser();
-        List<Long> ids = new ArrayList<>();
-        ids.add(current.getId());
+        List<User> users = new ArrayList<>();
+        users.add(current);
 
         if (current.getRole() == Role.PARENT) {
-            userRepository.findByParentId(current.getId()).forEach(child -> ids.add(child.getId()));
+            users.addAll(userRepository.findByParentId(current.getId()));
         }
 
-        return ids;
+        return users;
     }
 
     public User resolveTargetUser(Long requestedUserId) {

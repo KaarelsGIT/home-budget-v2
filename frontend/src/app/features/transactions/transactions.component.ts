@@ -11,12 +11,12 @@ import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { TransactionService } from '../../core/services/transaction.service';
 import { AccountService } from '../../core/services/account.service';
 import { CategoryService } from '../../core/services/category.service';
-import { NotificationService } from '../../core/services/notification.service';
-import { Account, TransferTarget } from '../../core/models/account.model';
-import { CategoryTreeNode } from '../../core/models/category.model';
+import { Account } from '../../core/models/account.model';
+import { Category } from '../../core/models/category.model';
 import { Transaction, TransactionRequest, TransactionType } from '../../core/models/transaction.model';
 import { SignedAmountPipe } from '../../shared/pipes/signed-amount.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
@@ -36,6 +36,7 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
     MatFormFieldModule,
     MatInputModule,
     MatSelectModule,
+    MatTooltipModule,
     DatePipe,
     SignedAmountPipe
   ],
@@ -52,33 +53,6 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
       gap: 8px;
       margin-bottom: 16px;
       flex-wrap: wrap;
-    }
-
-    .category-cell {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .category-header {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      font-weight: 600;
-      color: #24415f;
-      width: fit-content;
-      justify-content: flex-start;
-      padding-left: 0;
-    }
-
-    .subcategory {
-      font-size: 0.85rem;
-      color: #5b6f86;
-      margin-left: 28px;
-      padding: 4px 8px;
-      background: #edf4ff;
-      border-radius: 10px;
-      width: fit-content;
     }
 
     @media (max-width: 980px) {
@@ -106,7 +80,7 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
 
           <mat-form-field>
             <mat-label>Type</mat-label>
-            <mat-select formControlName="type">
+            <mat-select formControlName="type" (valueChange)="onFilterTypeChange($event)">
               <mat-option [value]="null">All</mat-option>
               @for (type of types; track type) {
                 <mat-option [value]="type">{{ type }}</mat-option>
@@ -118,8 +92,8 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
             <mat-label>Category</mat-label>
             <mat-select formControlName="categoryId">
               <mat-option [value]="null">All</mat-option>
-              @for (category of flatCategories(); track category.id) {
-                <mat-option [value]="category.id">{{ category.label }}</mat-option>
+              @for (category of filterCategories(); track category.id) {
+                <mat-option [value]="category.id">{{ category.name }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -162,21 +136,7 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
 
           <ng-container matColumnDef="category">
             <th mat-header-cell *matHeaderCellDef>Category</th>
-            <td mat-cell *matCellDef="let row">
-              <div class="category-cell">
-                @if (row.parentCategoryName && row.subCategoryName) {
-                  <button mat-button class="category-header" (click)="toggleCategory(row.id)">
-                    <mat-icon>{{ expandedCategoryRowId() === row.id ? 'expand_less' : 'expand_more' }}</mat-icon>
-                    {{ row.parentCategoryName }}
-                  </button>
-                  @if (expandedCategoryRowId() === row.id) {
-                    <div class="subcategory">{{ row.subCategoryName }}</div>
-                  }
-                } @else {
-                  <span>{{ row.categoryName || '-' }}</span>
-                }
-              </div>
-            </td>
+            <td mat-cell *matCellDef="let row">{{ row.categoryName || '-' }}</td>
           </ng-container>
 
           <ng-container matColumnDef="amount">
@@ -192,10 +152,10 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
           <ng-container matColumnDef="actions">
             <th mat-header-cell *matHeaderCellDef></th>
             <td mat-cell *matCellDef="let row">
-              <button mat-icon-button aria-label="Edit transaction" (click)="openEditDialog(row)">
+              <button mat-icon-button matTooltip="Edit" aria-label="Edit transaction" (click)="openEditDialog(row)">
                 <mat-icon>edit</mat-icon>
               </button>
-              <button mat-icon-button color="warn" aria-label="Delete transaction" (click)="deleteTransaction(row)">
+              <button mat-icon-button color="warn" matTooltip="Delete" aria-label="Delete transaction" (click)="deleteTransaction(row.id)">
                 <mat-icon>delete</mat-icon>
               </button>
             </td>
@@ -213,7 +173,6 @@ export class TransactionsComponent {
   private readonly transactionService = inject(TransactionService);
   private readonly accountService = inject(AccountService);
   private readonly categoryService = inject(CategoryService);
-  private readonly notificationService = inject(NotificationService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
@@ -221,12 +180,7 @@ export class TransactionsComponent {
   readonly types: TransactionType[] = ['INCOME', 'EXPENSE', 'TRANSFER'];
   readonly transactions = signal<Transaction[]>([]);
   readonly accounts = signal<Account[]>([]);
-  readonly myAccounts = signal<Account[]>([]);
-  readonly transferTargets = signal<TransferTarget[]>([]);
-  readonly incomeCategoryTree = signal<CategoryTreeNode[]>([]);
-  readonly expenseCategoryTree = signal<CategoryTreeNode[]>([]);
-  readonly flatCategories = signal<Array<{ id: number; label: string }>>([]);
-  readonly expandedCategoryRowId = signal<number | null>(null);
+  readonly filterCategories = signal<Category[]>([]);
 
   readonly filterForm = this.fb.group({
     startDate: [''],
@@ -246,34 +200,25 @@ export class TransactionsComponent {
     forkJoin({
       transactions: this.transactionService.getTransactions(),
       accounts: this.accountService.getAccounts(),
-      myAccounts: this.accountService.getMyAccounts(),
-      transferTargets: this.accountService.getTransferTargets(),
-      incomeCategories: this.categoryService.getCategoryTreeByType('INCOME'),
-      expenseCategories: this.categoryService.getCategoryTreeByType('EXPENSE')
-    }).subscribe(({ transactions, accounts, myAccounts, transferTargets, incomeCategories, expenseCategories }) => {
+      incomeCategories: this.categoryService.getCategoriesByType('INCOME'),
+      expenseCategories: this.categoryService.getCategoriesByType('EXPENSE')
+    }).subscribe(({ transactions, accounts, incomeCategories, expenseCategories }) => {
       this.transactions.set(transactions);
       this.accounts.set(accounts);
-      this.myAccounts.set(myAccounts);
-      this.transferTargets.set(transferTargets);
-      this.incomeCategoryTree.set(incomeCategories);
-      this.expenseCategoryTree.set(expenseCategories);
-      this.flatCategories.set(this.flattenCategories([...incomeCategories, ...expenseCategories]));
+      this.filterCategories.set([...incomeCategories, ...expenseCategories]);
     });
   }
 
-  private flattenCategories(categories: CategoryTreeNode[]): Array<{ id: number; label: string }> {
-    const rows: Array<{ id: number; label: string }> = [];
+  onFilterTypeChange(type: TransactionType | null): void {
+    this.filterForm.patchValue({ categoryId: null });
 
-    categories.forEach((root) => {
-      rows.push({ id: root.id, label: root.name });
-      root.children.forEach((child) => rows.push({ id: child.id, label: `${root.name} / ${child.name}` }));
-    });
+    if (!type || type === 'TRANSFER') {
+      this.categoryService.getCategories().subscribe((categories) => this.filterCategories.set(categories));
+      return;
+    }
 
-    return rows;
-  }
-
-  toggleCategory(transactionId: number): void {
-    this.expandedCategoryRowId.set(this.expandedCategoryRowId() === transactionId ? null : transactionId);
+    const categoryType = type === 'INCOME' ? 'INCOME' : 'EXPENSE';
+    this.categoryService.getCategoriesByType(categoryType).subscribe((categories) => this.filterCategories.set(categories));
   }
 
   applyFilters(): void {
@@ -303,17 +248,14 @@ export class TransactionsComponent {
       direction: 'DESC'
     });
 
-    this.transactionService.getTransactions().subscribe((rows) => this.transactions.set(rows));
+    this.loadDependencies();
   }
 
   openCreateDialog(): void {
     const ref = this.dialog.open(TransactionFormDialogComponent, {
       data: {
         transaction: null,
-        myAccounts: this.myAccounts(),
-        transferTargets: this.transferTargets(),
-        incomeCategories: this.incomeCategoryTree(),
-        expenseCategories: this.expenseCategoryTree()
+        accounts: this.accounts()
       },
       width: '620px'
     });
@@ -325,9 +267,6 @@ export class TransactionsComponent {
 
       this.transactionService.createTransaction(payload).subscribe(() => {
         this.snackBar.open('Transaction created', 'Close', { duration: 2500 });
-        if (payload.type === 'TRANSFER') {
-          this.handleTransferNotification();
-        }
         this.loadDependencies();
       });
     });
@@ -337,10 +276,7 @@ export class TransactionsComponent {
     const ref = this.dialog.open(TransactionFormDialogComponent, {
       data: {
         transaction,
-        myAccounts: this.myAccounts(),
-        transferTargets: this.transferTargets(),
-        incomeCategories: this.incomeCategoryTree(),
-        expenseCategories: this.expenseCategoryTree()
+        accounts: this.accounts()
       },
       width: '620px'
     });
@@ -357,11 +293,11 @@ export class TransactionsComponent {
     });
   }
 
-  deleteTransaction(transaction: Transaction): void {
+  deleteTransaction(transactionId: number): void {
     const ref = this.dialog.open(ConfirmDialogComponent, {
       data: {
         title: 'Delete Transaction',
-        message: `Delete transaction #${transaction.id}?`
+        message: `Delete transaction #${transactionId}?`
       }
     });
 
@@ -370,24 +306,10 @@ export class TransactionsComponent {
         return;
       }
 
-      this.transactionService.deleteTransaction(transaction.id).subscribe(() => {
+      this.transactionService.deleteTransaction(transactionId).subscribe(() => {
         this.snackBar.open('Transaction deleted', 'Close', { duration: 2500 });
         this.loadDependencies();
       });
-    });
-  }
-
-  private handleTransferNotification(): void {
-    this.notificationService.getNotifications().subscribe((notifications) => {
-      const incomingTransferNotification = notifications.find(
-        (notification) => !notification.read && notification.message.toLowerCase().includes('transfer')
-      );
-
-      if (incomingTransferNotification) {
-        this.snackBar.open(`Incoming transfer: ${incomingTransferNotification.message}`, 'Close', {
-          duration: 4500
-        });
-      }
     });
   }
 }

@@ -1,12 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
-import { map, Observable } from 'rxjs';
+import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Category, CategoryRequest, CategoryTreeNode, CategoryType } from '../models/category.model';
+import { Category, CategoryRequest, CategoryType } from '../models/category.model';
 
 @Injectable({ providedIn: 'root' })
 export class CategoryService {
-  private readonly baseUrl = `${environment.apiBaseUrl}/categories`;
+  private readonly baseUrl = `${environment.apiBaseUrl}/api/categories`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -16,7 +16,7 @@ export class CategoryService {
 
   getCategoriesByType(type: CategoryType): Observable<Category[]> {
     const params = new HttpParams().set('type', type);
-    return this.http.get<Category[]>(`${environment.apiBaseUrl}/api/categories`, { params });
+    return this.http.get<Category[]>(this.baseUrl, { params });
   }
 
   getCategoryById(id: number): Observable<Category> {
@@ -33,33 +33,5 @@ export class CategoryService {
 
   deleteCategory(id: number): Observable<void> {
     return this.http.delete<void>(`${this.baseUrl}/${id}`);
-  }
-
-  getCategoryTree(): Observable<CategoryTreeNode[]> {
-    return this.getCategories().pipe(map((categories) => this.buildTree(categories)));
-  }
-
-  getCategoryTreeByType(type: CategoryType): Observable<CategoryTreeNode[]> {
-    return this.getCategoriesByType(type).pipe(map((categories) => this.buildTree(categories)));
-  }
-
-  private buildTree(categories: Category[]): CategoryTreeNode[] {
-    const map = new Map<number, CategoryTreeNode>();
-
-    categories.forEach((category) => {
-      map.set(category.id, { ...category, children: [] });
-    });
-
-    const roots: CategoryTreeNode[] = [];
-
-    map.forEach((node) => {
-      if (node.parentId && map.has(node.parentId)) {
-        map.get(node.parentId)?.children.push(node);
-      } else {
-        roots.push(node);
-      }
-    });
-
-    return roots;
   }
 }

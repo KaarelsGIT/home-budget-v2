@@ -7,13 +7,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { Account } from '../../core/models/account.model';
-import { CategoryTreeNode } from '../../core/models/category.model';
+import { Category } from '../../core/models/category.model';
 import { RecurringFrequency, RecurringTransaction, RecurringTransactionRequest } from '../../core/models/recurring.model';
 import { CategorySelectComponent } from '../../shared/components/category-select.component';
 
 export interface RecurringDialogData {
   recurring: RecurringTransaction | null;
-  categories: CategoryTreeNode[];
+  categories: Category[];
   accounts: Account[];
 }
 

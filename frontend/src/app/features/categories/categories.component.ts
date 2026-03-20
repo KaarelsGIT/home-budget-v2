@@ -1,19 +1,19 @@
 import { Component, signal } from '@angular/core';
-import { MatTreeModule } from '@angular/material/tree';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatTableModule } from '@angular/material/table';
 import { CategoryService } from '../../core/services/category.service';
-import { Category, CategoryRequest, CategoryTreeNode } from '../../core/models/category.model';
+import { Category, CategoryRequest } from '../../core/models/category.model';
 import { CategoryFormDialogComponent } from './category-form-dialog.component';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 
 @Component({
   selector: 'app-categories',
   standalone: true,
-  imports: [MatTreeModule, MatButtonModule, MatIconModule, MatCardModule, MatDialogModule, MatSnackBarModule],
+  imports: [MatTableModule, MatButtonModule, MatIconModule, MatCardModule, MatDialogModule, MatSnackBarModule],
   template: `
     <mat-card>
       <mat-card-header>
@@ -21,41 +21,39 @@ import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.c
         <button mat-flat-button color="primary" (click)="openCreateDialog()">Add Category</button>
       </mat-card-header>
       <mat-card-content>
-        <mat-tree #tree [dataSource]="treeData()" [childrenAccessor]="childrenAccessor">
-          <mat-tree-node *matTreeNodeDef="let node">
-            <button mat-icon-button disabled></button>
-            {{ node.name }}
-            <button mat-icon-button (click)="openEditDialog(node)">
-              <mat-icon>edit</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="deleteCategory(node)">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </mat-tree-node>
+        <table mat-table [dataSource]="categories()" class="full-width">
+          <ng-container matColumnDef="name">
+            <th mat-header-cell *matHeaderCellDef>Name</th>
+            <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+          </ng-container>
 
-          <mat-tree-node *matTreeNodeDef="let node; when: hasChild" matTreeNodeToggle>
-            <button mat-icon-button matTreeNodeToggle>
-              <mat-icon>{{ tree.isExpanded(node) ? 'expand_more' : 'chevron_right' }}</mat-icon>
-            </button>
-            {{ node.name }}
-            <button mat-icon-button (click)="openEditDialog(node)">
-              <mat-icon>edit</mat-icon>
-            </button>
-            <button mat-icon-button color="warn" (click)="deleteCategory(node)">
-              <mat-icon>delete</mat-icon>
-            </button>
-          </mat-tree-node>
-        </mat-tree>
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let row">{{ row.type }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="actions">
+            <th mat-header-cell *matHeaderCellDef></th>
+            <td mat-cell *matCellDef="let row">
+              <button mat-icon-button (click)="openEditDialog(row)">
+                <mat-icon>edit</mat-icon>
+              </button>
+              <button mat-icon-button color="warn" (click)="deleteCategory(row)">
+                <mat-icon>delete</mat-icon>
+              </button>
+            </td>
+          </ng-container>
+
+          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+        </table>
       </mat-card-content>
     </mat-card>
   `
 })
 export class CategoriesComponent {
-  readonly treeData = signal<CategoryTreeNode[]>([]);
-  readonly allCategories = signal<Category[]>([]);
-
-  readonly childrenAccessor = (node: CategoryTreeNode) => node.children;
-  readonly hasChild = (_: number, node: CategoryTreeNode) => !!node.children?.length;
+  readonly displayedColumns = ['name', 'type', 'actions'];
+  readonly categories = signal<Category[]>([]);
 
   constructor(
     private readonly categoryService: CategoryService,
@@ -66,13 +64,12 @@ export class CategoriesComponent {
   }
 
   loadCategories(): void {
-    this.categoryService.getCategories().subscribe((categories) => this.allCategories.set(categories));
-    this.categoryService.getCategoryTree().subscribe((tree) => this.treeData.set(tree));
+    this.categoryService.getCategories().subscribe((categories) => this.categories.set(categories));
   }
 
   openCreateDialog(): void {
     const ref = this.dialog.open(CategoryFormDialogComponent, {
-      data: { category: null, categories: this.allCategories() }
+      data: { category: null }
     });
 
     ref.afterClosed().subscribe((payload: CategoryRequest | undefined) => {
@@ -89,7 +86,7 @@ export class CategoriesComponent {
 
   openEditDialog(category: Category): void {
     const ref = this.dialog.open(CategoryFormDialogComponent, {
-      data: { category, categories: this.allCategories() }
+      data: { category }
     });
 
     ref.afterClosed().subscribe((payload: CategoryRequest | undefined) => {

@@ -1,7 +1,6 @@
 package ee.kaarel.homebudgetappv2.service;
 
 import ee.kaarel.homebudgetappv2.dto.*;
-import ee.kaarel.homebudgetappv2.mapper.TransactionMapper;
 import ee.kaarel.homebudgetappv2.model.Category;
 import ee.kaarel.homebudgetappv2.model.Role;
 import ee.kaarel.homebudgetappv2.model.Transaction;
@@ -33,7 +32,6 @@ public class ReportService {
 
     private final TransactionRepository transactionRepository;
     private final UserAccessService userAccessService;
-    private final TransactionMapper transactionMapper;
 
     @Transactional(readOnly = true)
     public FamilyOverviewResponse getFamilyOverview(int year, Integer month) {
@@ -58,7 +56,7 @@ public class ReportService {
         OverviewTotals totals = buildTotals(transactions);
         List<OverviewMonthlyItem> monthlyItems = buildMonthlyItems(transactions, year, month);
         List<OverviewCategoryItem> categoryItems = buildCategoryItems(transactions);
-        List<TransactionResponse> rows = transactions.stream().map(transactionMapper::toResponse).toList();
+        List<TransactionDTO> rows = transactions.stream().map(this::toTransactionDto).toList();
 
         return new FamilyOverviewResponse(year, month, totals, monthlyItems, categoryItems, rows);
     }
@@ -157,9 +155,23 @@ public class ReportService {
         if (category == null) {
             return "Uncategorized::Uncategorized";
         }
-        if (category.getParent() == null) {
-            return category.getName() + "::(root)";
-        }
-        return category.getParent().getName() + "::" + category.getName();
+        return category.getName() + "::(total)";
+    }
+
+    private TransactionDTO toTransactionDto(Transaction transaction) {
+        TransactionDTO dto = new TransactionDTO();
+        dto.setId(transaction.getId());
+        dto.setType(transaction.getType());
+        dto.setAmount(transaction.getAmount());
+        dto.setDate(transaction.getDate());
+        dto.setDescription(transaction.getDescription());
+        dto.setUserId(transaction.getUser().getId());
+        dto.setCategoryId(transaction.getCategory() != null ? transaction.getCategory().getId() : null);
+        dto.setCategoryName(transaction.getCategory() != null ? transaction.getCategory().getName() : null);
+        dto.setFromAccountId(transaction.getFromAccount() != null ? transaction.getFromAccount().getId() : null);
+        dto.setToAccountId(transaction.getToAccount() != null ? transaction.getToAccount().getId() : null);
+        dto.setCreatedAt(transaction.getCreatedAt());
+        dto.setUpdatedAt(transaction.getUpdatedAt());
+        return dto;
     }
 }

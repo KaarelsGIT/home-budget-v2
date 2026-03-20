@@ -1,9 +1,6 @@
 package ee.kaarel.homebudgetappv2.controller;
 
-import ee.kaarel.homebudgetappv2.dto.TransactionRequest;
-import ee.kaarel.homebudgetappv2.dto.TransactionResponse;
-import ee.kaarel.homebudgetappv2.dto.TransferRequest;
-import ee.kaarel.homebudgetappv2.dto.TransferResponse;
+import ee.kaarel.homebudgetappv2.dto.TransactionDTO;
 import ee.kaarel.homebudgetappv2.model.TransactionType;
 import ee.kaarel.homebudgetappv2.service.TransactionService;
 import jakarta.validation.Valid;
@@ -23,29 +20,24 @@ public class TransactionController {
     private final TransactionService transactionService;
 
     @GetMapping
-    public ResponseEntity<List<TransactionResponse>> getAll() {
+    public ResponseEntity<List<TransactionDTO>> getAll() {
         return ResponseEntity.ok(transactionService.getAll());
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TransactionResponse> getById(@PathVariable Long id) {
+    public ResponseEntity<TransactionDTO> getById(@PathVariable Long id) {
         return ResponseEntity.ok(transactionService.getById(id));
     }
 
     @PostMapping
-    public ResponseEntity<TransactionResponse> create(@Valid @RequestBody TransactionRequest request,
-                                                      @RequestParam(required = false) Long userId) {
+    public ResponseEntity<TransactionDTO> create(@Valid @RequestBody TransactionDTO request,
+                                                 @RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(transactionService.create(request, userId));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TransactionResponse> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
+    public ResponseEntity<TransactionDTO> update(@PathVariable Long id, @Valid @RequestBody TransactionDTO request) {
         return ResponseEntity.ok(transactionService.update(id, request));
-    }
-
-    @PostMapping("/transfer")
-    public ResponseEntity<TransferResponse> transfer(@Valid @RequestBody TransferRequest request) {
-        return ResponseEntity.ok(transactionService.transfer(request));
     }
 
     @DeleteMapping("/{id}")
@@ -55,7 +47,7 @@ public class TransactionController {
     }
 
     @GetMapping("/filter")
-    public ResponseEntity<List<TransactionResponse>> filter(
+    public ResponseEntity<List<TransactionDTO>> filter(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
             @RequestParam(required = false) Long categoryId,

@@ -319,11 +319,7 @@ export class OverviewComponent {
     return this.months.find((m) => m.value === month)?.label ?? String(month);
   }
 
-  formatCategory(transaction: { parentCategoryName?: string | null; subCategoryName?: string | null; categoryName?: string | null }): string {
-    if (transaction.parentCategoryName && transaction.subCategoryName) {
-      return `${transaction.parentCategoryName} / ${transaction.subCategoryName}`;
-    }
-
+  formatCategory(transaction: { categoryName?: string | null }): string {
     return transaction.categoryName ?? '-';
   }
 }
