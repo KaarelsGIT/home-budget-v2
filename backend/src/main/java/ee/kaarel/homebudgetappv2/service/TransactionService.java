@@ -123,14 +123,6 @@ public class TransactionService {
         Account fromAccount = request.getFromAccountId() == null ? null : getAccessibleAccount(request.getFromAccountId());
         Account toAccount = request.getToAccountId() == null ? null : getAccessibleAccount(request.getToAccountId());
 
-        if (fromAccount != null && !fromAccount.getUser().getId().equals(owner.getId())) {
-            throw new ResponseStatusException(BAD_REQUEST, "fromAccount must belong to transaction owner");
-        }
-
-        if (toAccount != null && !toAccount.getUser().getId().equals(owner.getId())) {
-            throw new ResponseStatusException(BAD_REQUEST, "toAccount must belong to transaction owner");
-        }
-
         if (request.getType() == TransactionType.TRANSFER && fromAccount.getId().equals(toAccount.getId())) {
             throw new ResponseStatusException(BAD_REQUEST, "Transfer accounts must be different");
         }
