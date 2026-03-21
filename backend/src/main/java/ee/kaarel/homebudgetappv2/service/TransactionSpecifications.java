@@ -17,11 +17,15 @@ public final class TransactionSpecifications {
     }
 
     public static Specification<Transaction> dateFrom(LocalDate startDate) {
-        return (root, query, cb) -> startDate == null ? cb.conjunction() : cb.greaterThanOrEqualTo(root.get("date"), startDate);
+        return (root, query, cb) -> startDate == null
+                ? cb.conjunction()
+                : cb.greaterThanOrEqualTo(root.get("createdAt"), startDate.atStartOfDay());
     }
 
     public static Specification<Transaction> dateTo(LocalDate endDate) {
-        return (root, query, cb) -> endDate == null ? cb.conjunction() : cb.lessThanOrEqualTo(root.get("date"), endDate);
+        return (root, query, cb) -> endDate == null
+                ? cb.conjunction()
+                : cb.lessThan(root.get("createdAt"), endDate.plusDays(1).atStartOfDay());
     }
 
     public static Specification<Transaction> category(Long categoryId) {

@@ -22,10 +22,15 @@ public class Account {
     @Column(nullable = false, precision = 19, scale = 4)
     private BigDecimal balance;
 
-    @Column(nullable = false, length = 3)
-    private String currency;
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private AccountType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_account_id")
+    private Account parentAccount;
 }

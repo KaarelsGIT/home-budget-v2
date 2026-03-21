@@ -1,6 +1,7 @@
 package ee.kaarel.homebudgetappv2.service;
 
 import ee.kaarel.homebudgetappv2.dto.CategoryDTO;
+import ee.kaarel.homebudgetappv2.dto.CategoryTreeDto;
 import ee.kaarel.homebudgetappv2.model.Category;
 import ee.kaarel.homebudgetappv2.model.CategoryType;
 import ee.kaarel.homebudgetappv2.model.User;
@@ -10,8 +11,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.ArrayList;
 import java.util.List;
 
+import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -38,8 +41,19 @@ public class CategoryService {
     }
 
     @Transactional(readOnly = true)
+    public List<CategoryTreeDto> getTree(CategoryType type) {
+        List<Category> categories = type == null
+                ? categoryRepository.findByUserIdIn(userAccessService.getAccessibleUserIds())
+                : categoryRepository.findByUserIdInAndType(userAccessService.getAccessibleUserIds(), type);
+
+        List<Category> roots = categories.stream().filter(c -> c.getParent() == null).toList();
+        return roots.stream().map(c -> toTree(c, categories)).toList();
+    }
+
+    @Transactional(readOnly = true)
     public CategoryDTO getById(Long id) {
-        return toDto(getAccessibleCategoryOrThrow(id));
+        Category category = getAccessibleCategoryOrThrow(id);
+        return toDto(category);
     }
 
     @Transactional
@@ -51,16 +65,43 @@ public class CategoryService {
         category.setType(request.getType());
         category.setUser(targetUser);
 
+        if (request.getParentId() != null) {
+            Category parent = getAccessibleCategoryOrThrow(request.getParentId());
+            if (!parent.getUser().getId().equals(targetUser.getId())) {
+                throw new ResponseStatusException(BAD_REQUEST, "Parent category must belong to the same user");
+            }
+            if (parent.getType() != request.getType()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Parent category type must match child category type");
+            }
+            category.setParent(parent);
+        }
+
         return toDto(categoryRepository.save(category));
     }
 
     @Transactional
     public CategoryDTO update(Long id, CategoryDTO request) {
-        Category existing = getAccessibleCategoryOrThrow(id);
-        existing.setName(request.getName());
-        existing.setType(request.getType());
+        Category category = getAccessibleCategoryOrThrow(id);
+        category.setName(request.getName());
+        category.setType(request.getType());
 
-        return toDto(categoryRepository.save(existing));
+        if (request.getParentId() != null) {
+            if (request.getParentId().equals(id)) {
+                throw new ResponseStatusException(BAD_REQUEST, "Category cannot be parent of itself");
+            }
+            Category parent = getAccessibleCategoryOrThrow(request.getParentId());
+            if (!parent.getUser().getId().equals(category.getUser().getId())) {
+                throw new ResponseStatusException(BAD_REQUEST, "Parent category must belong to the same user");
+            }
+            if (parent.getType() != request.getType()) {
+                throw new ResponseStatusException(BAD_REQUEST, "Parent category type must match child category type");
+            }
+            category.setParent(parent);
+        } else {
+            category.setParent(null);
+        }
+
+        return toDto(categoryRepository.save(category));
     }
 
     @Transactional
@@ -80,7 +121,17 @@ public class CategoryService {
         dto.setId(category.getId());
         dto.setName(category.getName());
         dto.setType(category.getType());
+        dto.setParentId(category.getParent() != null ? category.getParent().getId() : null);
         dto.setUserId(category.getUser().getId());
         return dto;
+    }
+
+    private CategoryTreeDto toTree(Category category, List<Category> all) {
+        List<CategoryTreeDto> children = new ArrayList<>();
+        all.stream().filter(c -> c.getParent() != null && c.getParent().getId().equals(category.getId()))
+                .forEach(child -> children.add(toTree(child, all)));
+
+        return new CategoryTreeDto(category.getId(), category.getName(), category.getType(),
+                category.getParent() != null ? category.getParent().getId() : null, children);
     }
 }

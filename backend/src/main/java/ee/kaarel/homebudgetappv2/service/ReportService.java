@@ -51,7 +51,7 @@ public class ReportService {
                 .and(TransactionSpecifications.dateFrom(from))
                 .and(TransactionSpecifications.dateTo(to));
 
-        List<Transaction> transactions = transactionRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "date"));
+        List<Transaction> transactions = transactionRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"));
 
         OverviewTotals totals = buildTotals(transactions);
         List<OverviewMonthlyItem> monthlyItems = buildMonthlyItems(transactions, year, month);
@@ -92,10 +92,10 @@ public class ReportService {
         }
 
         for (Transaction transaction : transactions) {
-            if (transaction.getDate().getYear() != year) {
+            if (transaction.getCreatedAt().getYear() != year) {
                 continue;
             }
-            int month = transaction.getDate().getMonthValue();
+            int month = transaction.getCreatedAt().getMonthValue();
             if (!incomeByMonth.containsKey(month)) {
                 continue;
             }
@@ -163,15 +163,12 @@ public class ReportService {
         dto.setId(transaction.getId());
         dto.setType(transaction.getType());
         dto.setAmount(transaction.getAmount());
-        dto.setDate(transaction.getDate());
-        dto.setDescription(transaction.getDescription());
         dto.setUserId(transaction.getUser().getId());
         dto.setCategoryId(transaction.getCategory() != null ? transaction.getCategory().getId() : null);
         dto.setCategoryName(transaction.getCategory() != null ? transaction.getCategory().getName() : null);
         dto.setFromAccountId(transaction.getFromAccount() != null ? transaction.getFromAccount().getId() : null);
         dto.setToAccountId(transaction.getToAccount() != null ? transaction.getToAccount().getId() : null);
         dto.setCreatedAt(transaction.getCreatedAt());
-        dto.setUpdatedAt(transaction.getUpdatedAt());
         return dto;
     }
 }

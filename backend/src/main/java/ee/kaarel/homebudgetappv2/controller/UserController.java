@@ -1,8 +1,7 @@
 package ee.kaarel.homebudgetappv2.controller;
 
-import ee.kaarel.homebudgetappv2.dto.UserDTO;
-import ee.kaarel.homebudgetappv2.model.User;
-import ee.kaarel.homebudgetappv2.service.UserAccessService;
+import ee.kaarel.homebudgetappv2.dto.UserSummaryDto;
+import ee.kaarel.homebudgetappv2.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -16,22 +15,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class UserController {
 
-    private final UserAccessService userAccessService;
+    private final UserService userService;
 
     @GetMapping
-    public ResponseEntity<List<UserDTO>> getUsers() {
-        List<UserDTO> users = userAccessService.getAccessibleUsers().stream()
-                .map(this::toDto)
-                .toList();
-        return ResponseEntity.ok(users);
-    }
-
-    private UserDTO toDto(User user) {
-        return new UserDTO(
-                user.getId(),
-                user.getEmail(),
-                user.getRole(),
-                user.getParent() != null ? user.getParent().getId() : null
-        );
+    public ResponseEntity<List<UserSummaryDto>> getUsers() {
+        return ResponseEntity.ok(userService.getAll());
     }
 }

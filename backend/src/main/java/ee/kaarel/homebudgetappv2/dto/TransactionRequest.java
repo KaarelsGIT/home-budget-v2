@@ -1,13 +1,12 @@
 package ee.kaarel.homebudgetappv2.dto;
 
 import ee.kaarel.homebudgetappv2.model.TransactionType;
-import jakarta.validation.constraints.DecimalMin;
+import jakarta.validation.constraints.Positive;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;
 import lombok.Setter;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
 
 @Getter
 @Setter
@@ -17,15 +16,8 @@ public class TransactionRequest {
     private TransactionType type;
 
     @NotNull
-    @DecimalMin("0.01")
+    @Positive
     private BigDecimal amount;
-
-    @NotNull
-    private LocalDate date;
-
-    private String description;
-    private Long parentCategoryId;
-    private Long subCategoryId;
     private Long categoryId;
     private Long fromAccountId;
     private Long toAccountId;

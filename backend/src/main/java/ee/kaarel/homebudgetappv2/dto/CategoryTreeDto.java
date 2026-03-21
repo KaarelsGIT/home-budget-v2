@@ -1,23 +1,17 @@
 package ee.kaarel.homebudgetappv2.dto;
 
 import ee.kaarel.homebudgetappv2.model.CategoryType;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
 import lombok.Getter;
-import lombok.Setter;
+
+import java.util.List;
 
 @Getter
-@Setter
-public class CategoryDTO {
-
+@AllArgsConstructor
+public class CategoryTreeDto {
     private Long id;
-
-    @NotBlank
     private String name;
-
-    @NotNull
     private CategoryType type;
-
     private Long parentId;
-    private Long userId;
+    private List<CategoryTreeDto> children;
 }

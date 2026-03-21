@@ -2,7 +2,6 @@ package ee.kaarel.homebudgetappv2.controller;
 
 import ee.kaarel.homebudgetappv2.dto.AccountRequest;
 import ee.kaarel.homebudgetappv2.dto.AccountResponse;
-import ee.kaarel.homebudgetappv2.dto.TransferTargetResponse;
 import ee.kaarel.homebudgetappv2.service.AccountService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,18 +18,8 @@ public class AccountController {
     private final AccountService accountService;
 
     @GetMapping
-    public ResponseEntity<List<AccountResponse>> getAll() {
-        return ResponseEntity.ok(accountService.getAll());
-    }
-
-    @GetMapping("/my")
-    public ResponseEntity<List<AccountResponse>> getMyAccounts() {
-        return ResponseEntity.ok(accountService.getMyAccounts());
-    }
-
-    @GetMapping("/transfer-targets")
-    public ResponseEntity<List<TransferTargetResponse>> getTransferTargets() {
-        return ResponseEntity.ok(accountService.getTransferTargets());
+    public ResponseEntity<List<AccountResponse>> getAll(@RequestParam(required = false) Long userId) {
+        return ResponseEntity.ok(accountService.getAll(userId));
     }
 
     @GetMapping("/{id}")

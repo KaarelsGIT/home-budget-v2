@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface AccountMapper {
 
     @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "parentAccountId", source = "parentAccount.id")
     AccountResponse toResponse(Account account);
 }

@@ -115,8 +115,6 @@ public class RecurringTransactionService {
         Transaction transaction = new Transaction();
         transaction.setType(TransactionType.EXPENSE);
         transaction.setAmount(recurring.getAmount());
-        transaction.setDate(recurring.getNextExecutionDate());
-        transaction.setDescription("Auto-generated recurring payment");
         transaction.setUser(recurring.getUser());
         transaction.setCategory(recurring.getCategory());
         transaction.setFromAccount(recurring.getAccount());

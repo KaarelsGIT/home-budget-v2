@@ -1,6 +1,7 @@
 package ee.kaarel.homebudgetappv2.controller;
 
 import ee.kaarel.homebudgetappv2.dto.TransactionDTO;
+import ee.kaarel.homebudgetappv2.dto.TransactionRequest;
 import ee.kaarel.homebudgetappv2.model.TransactionType;
 import ee.kaarel.homebudgetappv2.service.TransactionService;
 import jakarta.validation.Valid;
@@ -30,13 +31,13 @@ public class TransactionController {
     }
 
     @PostMapping
-    public ResponseEntity<TransactionDTO> create(@Valid @RequestBody TransactionDTO request,
+    public ResponseEntity<TransactionDTO> create(@Valid @RequestBody TransactionRequest request,
                                                  @RequestParam(required = false) Long userId) {
         return ResponseEntity.ok(transactionService.create(request, userId));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TransactionDTO> update(@PathVariable Long id, @Valid @RequestBody TransactionDTO request) {
+    public ResponseEntity<TransactionDTO> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
         return ResponseEntity.ok(transactionService.update(id, request));
     }
 
@@ -53,7 +54,7 @@ public class TransactionController {
             @RequestParam(required = false) Long categoryId,
             @RequestParam(required = false) TransactionType type,
             @RequestParam(required = false) Long accountId,
-            @RequestParam(defaultValue = "date") String sortBy,
+            @RequestParam(defaultValue = "createdAt") String sortBy,
             @RequestParam(defaultValue = "DESC") String direction
     ) {
         return ResponseEntity.ok(transactionService.filter(startDate, endDate, categoryId, type, accountId, sortBy, direction));

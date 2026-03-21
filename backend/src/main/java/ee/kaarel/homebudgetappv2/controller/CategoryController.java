@@ -1,6 +1,7 @@
 package ee.kaarel.homebudgetappv2.controller;
 
 import ee.kaarel.homebudgetappv2.dto.CategoryDTO;
+import ee.kaarel.homebudgetappv2.dto.CategoryTreeDto;
 import ee.kaarel.homebudgetappv2.model.CategoryType;
 import ee.kaarel.homebudgetappv2.service.CategoryService;
 import jakarta.validation.Valid;
@@ -23,6 +24,11 @@ public class CategoryController {
             return ResponseEntity.ok(categoryService.getAll());
         }
         return ResponseEntity.ok(categoryService.getAllByType(type));
+    }
+
+    @GetMapping("/tree")
+    public ResponseEntity<List<CategoryTreeDto>> getTree(@RequestParam(required = false) CategoryType type) {
+        return ResponseEntity.ok(categoryService.getTree(type));
     }
 
     @GetMapping("/{id}")

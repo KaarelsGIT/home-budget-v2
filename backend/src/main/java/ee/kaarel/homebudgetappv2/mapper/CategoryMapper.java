@@ -9,5 +9,6 @@ import org.mapstruct.Mapping;
 public interface CategoryMapper {
 
     @Mapping(target = "userId", source = "user.id")
+    @Mapping(target = "parentId", source = "parent.id")
     CategoryDTO toDto(Category category);
 }
