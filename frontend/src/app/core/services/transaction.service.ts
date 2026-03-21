@@ -2,11 +2,17 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Transaction, TransactionFilter, TransactionRequest } from '../models/transaction.model';
+import {
+  Transaction,
+  TransactionFilter,
+  TransactionRequest,
+  TransferRequestApi
+} from '../models/transaction.model';
 
 @Injectable({ providedIn: 'root' })
 export class TransactionService {
-  private readonly baseUrl = `${environment.apiBaseUrl}/api/transactions`;
+  private readonly baseUrl = `${environment.apiBaseUrl}/transactions`;
+  private readonly transferUrl = `${environment.apiBaseUrl}/transfers`;
 
   constructor(private readonly http: HttpClient) {}
 
@@ -24,6 +30,10 @@ export class TransactionService {
 
   updateTransaction(id: number, payload: TransactionRequest): Observable<Transaction> {
     return this.http.put<Transaction>(`${this.baseUrl}/${id}`, payload);
+  }
+
+  transfer(payload: TransferRequestApi): Observable<Transaction> {
+    return this.http.post<Transaction>(this.transferUrl, payload);
   }
 
   deleteTransaction(id: number): Observable<void> {
@@ -49,7 +59,7 @@ export class TransactionService {
       params = params.set('accountId', String(filter.accountId));
     }
 
-    params = params.set('sortBy', filter.sortBy ?? 'date').set('direction', filter.direction ?? 'DESC');
+    params = params.set('sortBy', filter.sortBy ?? 'createdAt').set('direction', filter.direction ?? 'DESC');
 
     return this.http.get<Transaction[]>(`${this.baseUrl}/filter`, { params });
   }

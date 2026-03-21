@@ -32,7 +32,7 @@ export class DashboardService {
 
   getRecentTransactions(limit = 5): Observable<Transaction[]> {
     return this.transactionService
-      .filterTransactions({ sortBy: 'date', direction: 'DESC' })
+      .filterTransactions({ sortBy: 'createdAt', direction: 'DESC' })
       .pipe(map((rows) => rows.slice(0, limit)));
   }
 

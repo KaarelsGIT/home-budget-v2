@@ -4,7 +4,8 @@ import { MAT_DIALOG_DATA, MatDialogActions, MatDialogClose, MatDialogContent, Ma
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
-import { Account } from '../../core/models/account.model';
+import { MatSelectModule } from '@angular/material/select';
+import { Account, AccountRequest, AccountType } from '../../core/models/account.model';
 
 @Component({
   selector: 'app-account-form-dialog',
@@ -17,10 +18,11 @@ import { Account } from '../../core/models/account.model';
     MatDialogClose,
     MatFormFieldModule,
     MatInputModule,
-    MatButtonModule
+    MatButtonModule,
+    MatSelectModule
   ],
   template: `
-    <h2 mat-dialog-title>{{ data ? 'Edit Account' : 'New Account' }}</h2>
+    <h2 mat-dialog-title>{{ data.account ? 'Edit Account' : 'New Account' }}</h2>
     <mat-dialog-content>
       <form [formGroup]="form" class="page-container">
         <mat-form-field>
@@ -34,8 +36,22 @@ import { Account } from '../../core/models/account.model';
         </mat-form-field>
 
         <mat-form-field>
-          <mat-label>Currency (3 letters)</mat-label>
-          <input matInput formControlName="currency" />
+          <mat-label>Type</mat-label>
+          <mat-select formControlName="type">
+            @for (type of accountTypes; track type) {
+              <mat-option [value]="type">{{ type }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field>
+          <mat-label>Parent Account</mat-label>
+          <mat-select formControlName="parentAccountId">
+            <mat-option [value]="null">None</mat-option>
+            @for (account of parentOptions(); track account.id) {
+              <mat-option [value]="account.id">{{ account.name }}</mat-option>
+            }
+          </mat-select>
         </mat-form-field>
       </form>
     </mat-dialog-content>
@@ -48,23 +64,25 @@ import { Account } from '../../core/models/account.model';
 export class AccountFormDialogComponent {
   private readonly fb = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<AccountFormDialogComponent>);
-  readonly data = inject<Account | null>(MAT_DIALOG_DATA);
+  readonly data = inject<{ account: Account | null; accounts: Account[] }>(MAT_DIALOG_DATA);
+  readonly accountTypes: AccountType[] = ['PERSONAL', 'SHARED'];
 
-  readonly form = this.fb.nonNullable.group({
-    name: [this.data?.name ?? '', [Validators.required]],
-    balance: [this.data?.balance ?? 0, [Validators.required, Validators.min(0)]],
-    currency: [this.data?.currency ?? 'EUR', [Validators.required, Validators.minLength(3), Validators.maxLength(3)]]
+  readonly form = this.fb.group({
+    name: [this.data.account?.name ?? '', [Validators.required]],
+    balance: [this.data.account?.balance ?? 0, [Validators.required, Validators.min(0)]],
+    type: [this.data.account?.type ?? ('PERSONAL' as AccountType), [Validators.required]],
+    parentAccountId: [this.data.account?.parentAccountId ?? null]
   });
+
+  parentOptions(): Account[] {
+    return this.data.accounts.filter((account) => account.id !== this.data.account?.id);
+  }
 
   save(): void {
     if (this.form.invalid) {
       return;
     }
 
-    const value = this.form.getRawValue();
-    this.dialogRef.close({
-      ...value,
-      currency: value.currency.toUpperCase()
-    });
+    this.dialogRef.close(this.form.getRawValue() as AccountRequest);
   }
 }

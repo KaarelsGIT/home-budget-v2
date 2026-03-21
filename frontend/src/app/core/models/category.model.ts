@@ -5,9 +5,11 @@ export interface Category {
   name: string;
   type: CategoryType;
   userId: number;
+  parentId?: number | null;
 }
 
 export interface CategoryRequest {
   name: string;
   type: CategoryType;
+  parentId?: number | null;
 }

@@ -67,8 +67,8 @@ import { Notification } from '../../core/models/notification.model';
             <mat-list>
               @for (transaction of recentTransactions(); track transaction.id) {
                 <mat-list-item>
-                  <span matListItemTitle>{{ transaction.description || transaction.type }}</span>
-                  <span matListItemLine class="muted">{{ transaction.date | date }}</span>
+                  <span matListItemTitle>{{ transaction.categoryName || transaction.type }}</span>
+                  <span matListItemLine class="muted">{{ transaction.createdAt | date : 'short' }}</span>
                   <span matListItemMeta>
                     {{ transaction.amount | signedAmount : transaction.type }}
                   </span>

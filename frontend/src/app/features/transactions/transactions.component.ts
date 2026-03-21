@@ -15,9 +15,11 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 import { TransactionService } from '../../core/services/transaction.service';
 import { AccountService } from '../../core/services/account.service';
 import { CategoryService } from '../../core/services/category.service';
+import { UserService } from '../../core/services/user.service';
 import { Account } from '../../core/models/account.model';
 import { Category } from '../../core/models/category.model';
-import { Transaction, TransactionRequest, TransactionType } from '../../core/models/transaction.model';
+import { Transaction, TransactionRequest, TransactionType, TransferRequestApi } from '../../core/models/transaction.model';
+import { UserSummary } from '../../core/models/user.model';
 import { SignedAmountPipe } from '../../shared/pipes/signed-amount.pipe';
 import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
 import { TransactionFormDialogComponent } from './transaction-form-dialog.component';
@@ -55,6 +57,21 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
       flex-wrap: wrap;
     }
 
+    .transaction-income {
+      color: #1c8b4b;
+      font-weight: 600;
+    }
+
+    .transaction-expense {
+      color: #c0392b;
+      font-weight: 600;
+    }
+
+    .transaction-transfer {
+      color: #1769aa;
+      font-weight: 600;
+    }
+
     @media (max-width: 980px) {
       .toolbar {
         grid-template-columns: repeat(2, minmax(120px, 1fr));
@@ -83,7 +100,7 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
             <mat-select formControlName="type" (valueChange)="onFilterTypeChange($event)">
               <mat-option [value]="null">All</mat-option>
               @for (type of types; track type) {
-                <mat-option [value]="type">{{ type }}</mat-option>
+                <mat-option [value]="type">{{ typeLabel(type) }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -111,7 +128,7 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
           <mat-form-field>
             <mat-label>Sort</mat-label>
             <mat-select formControlName="sortBy">
-              <mat-option value="date">Date</mat-option>
+              <mat-option value="createdAt">Date</mat-option>
               <mat-option value="amount">Amount</mat-option>
             </mat-select>
           </mat-form-field>
@@ -124,14 +141,16 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
         </div>
 
         <table mat-table [dataSource]="transactions()" class="full-width">
-          <ng-container matColumnDef="date">
+          <ng-container matColumnDef="createdAt">
             <th mat-header-cell *matHeaderCellDef>Date</th>
-            <td mat-cell *matCellDef="let row">{{ row.date | date }}</td>
+            <td mat-cell *matCellDef="let row">{{ row.createdAt | date : 'short' }}</td>
           </ng-container>
 
           <ng-container matColumnDef="type">
             <th mat-header-cell *matHeaderCellDef>Type</th>
-            <td mat-cell *matCellDef="let row">{{ row.type }}</td>
+            <td mat-cell *matCellDef="let row">
+              <span [class]="typeClass(row.type)">{{ typeLabel(row.type) }}</span>
+            </td>
           </ng-container>
 
           <ng-container matColumnDef="category">
@@ -144,9 +163,9 @@ import { TransactionFormDialogComponent } from './transaction-form-dialog.compon
             <td mat-cell *matCellDef="let row">{{ row.amount | signedAmount : row.type }}</td>
           </ng-container>
 
-          <ng-container matColumnDef="description">
-            <th mat-header-cell *matHeaderCellDef>Description</th>
-            <td mat-cell *matCellDef="let row">{{ row.description || '-' }}</td>
+          <ng-container matColumnDef="accounts">
+            <th mat-header-cell *matHeaderCellDef>Accounts</th>
+            <td mat-cell *matCellDef="let row">{{ accountFlowLabel(row) }}</td>
           </ng-container>
 
           <ng-container matColumnDef="actions">
@@ -173,13 +192,15 @@ export class TransactionsComponent {
   private readonly transactionService = inject(TransactionService);
   private readonly accountService = inject(AccountService);
   private readonly categoryService = inject(CategoryService);
+  private readonly userService = inject(UserService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
 
-  readonly displayedColumns = ['date', 'type', 'category', 'amount', 'description', 'actions'];
+  readonly displayedColumns = ['createdAt', 'type', 'category', 'accounts', 'amount', 'actions'];
   readonly types: TransactionType[] = ['INCOME', 'EXPENSE', 'TRANSFER'];
   readonly transactions = signal<Transaction[]>([]);
   readonly accounts = signal<Account[]>([]);
+  readonly users = signal<UserSummary[]>([]);
   readonly filterCategories = signal<Category[]>([]);
 
   readonly filterForm = this.fb.group({
@@ -188,7 +209,7 @@ export class TransactionsComponent {
     type: [null as TransactionType | null],
     categoryId: [null as number | null],
     accountId: [null as number | null],
-    sortBy: ['date' as 'date' | 'amount'],
+    sortBy: ['createdAt' as 'createdAt' | 'amount'],
     direction: ['DESC' as 'ASC' | 'DESC']
   });
 
@@ -200,11 +221,13 @@ export class TransactionsComponent {
     forkJoin({
       transactions: this.transactionService.getTransactions(),
       accounts: this.accountService.getAccounts(),
+      users: this.userService.getUsers(),
       incomeCategories: this.categoryService.getCategoriesByType('INCOME'),
       expenseCategories: this.categoryService.getCategoriesByType('EXPENSE')
-    }).subscribe(({ transactions, accounts, incomeCategories, expenseCategories }) => {
+    }).subscribe(({ transactions, accounts, users, incomeCategories, expenseCategories }) => {
       this.transactions.set(transactions);
       this.accounts.set(accounts);
+      this.users.set(users);
       this.filterCategories.set([...incomeCategories, ...expenseCategories]);
     });
   }
@@ -231,7 +254,7 @@ export class TransactionsComponent {
         type: value.type ?? undefined,
         categoryId: value.categoryId ?? undefined,
         accountId: value.accountId ?? undefined,
-        sortBy: value.sortBy ?? 'date',
+        sortBy: value.sortBy ?? 'createdAt',
         direction: value.direction ?? 'DESC'
       })
       .subscribe((rows) => this.transactions.set(rows));
@@ -244,7 +267,7 @@ export class TransactionsComponent {
       type: null,
       categoryId: null,
       accountId: null,
-      sortBy: 'date',
+      sortBy: 'createdAt',
       direction: 'DESC'
     });
 
@@ -255,20 +278,31 @@ export class TransactionsComponent {
     const ref = this.dialog.open(TransactionFormDialogComponent, {
       data: {
         transaction: null,
-        accounts: this.accounts()
+        accounts: this.accounts(),
+        users: this.users()
       },
       width: '620px'
     });
 
-    ref.afterClosed().subscribe((payload: TransactionRequest | undefined) => {
+    ref.afterClosed().subscribe((payload: { transaction?: TransactionRequest; transfer?: TransferRequestApi } | undefined) => {
       if (!payload) {
         return;
       }
 
-      this.transactionService.createTransaction(payload).subscribe(() => {
-        this.snackBar.open('Transaction created', 'Close', { duration: 2500 });
-        this.loadDependencies();
-      });
+      if (payload.transfer) {
+        this.transactionService.transfer(payload.transfer).subscribe(() => {
+          this.snackBar.open('Transfer created', 'Close', { duration: 2500 });
+          this.loadDependencies();
+        });
+        return;
+      }
+
+      if (payload.transaction) {
+        this.transactionService.createTransaction(payload.transaction).subscribe(() => {
+          this.snackBar.open('Transaction created', 'Close', { duration: 2500 });
+          this.loadDependencies();
+        });
+      }
     });
   }
 
@@ -276,17 +310,18 @@ export class TransactionsComponent {
     const ref = this.dialog.open(TransactionFormDialogComponent, {
       data: {
         transaction,
-        accounts: this.accounts()
+        accounts: this.accounts(),
+        users: this.users()
       },
       width: '620px'
     });
 
-    ref.afterClosed().subscribe((payload: TransactionRequest | undefined) => {
-      if (!payload) {
+    ref.afterClosed().subscribe((payload: { transaction?: TransactionRequest; transfer?: TransferRequestApi } | undefined) => {
+      if (!payload || !payload.transaction) {
         return;
       }
 
-      this.transactionService.updateTransaction(transaction.id, payload).subscribe(() => {
+      this.transactionService.updateTransaction(transaction.id, payload.transaction).subscribe(() => {
         this.snackBar.open('Transaction updated', 'Close', { duration: 2500 });
         this.loadDependencies();
       });
@@ -311,5 +346,38 @@ export class TransactionsComponent {
         this.loadDependencies();
       });
     });
+  }
+
+  typeClass(type: TransactionType): string {
+    return `transaction-${type.toLowerCase()}`;
+  }
+
+  typeLabel(type: TransactionType): string {
+    return type.charAt(0) + type.slice(1).toLowerCase();
+  }
+
+  accountFlowLabel(transaction: Transaction): string {
+    if (transaction.type === 'INCOME') {
+      return this.accountName(transaction.toAccountId) ?? '-';
+    }
+    if (transaction.type === 'EXPENSE') {
+      return this.accountName(transaction.fromAccountId) ?? '-';
+    }
+
+    return `${this.accountName(transaction.fromAccountId) ?? '-'} -> ${this.accountName(transaction.toAccountId) ?? '-'}`;
+  }
+
+  private accountName(accountId?: number | null): string | null {
+    if (accountId == null) {
+      return null;
+    }
+
+    const account = this.accounts().find((item) => item.id === accountId);
+    if (!account) {
+      return null;
+    }
+
+    const user = this.users().find((item) => item.id === account.userId);
+    return user ? `${account.name} (${user.username || user.email})` : account.name;
   }
 }

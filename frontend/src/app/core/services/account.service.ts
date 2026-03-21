@@ -1,8 +1,8 @@
 import { Injectable } from '@angular/core';
-import { HttpClient } from '@angular/common/http';
+import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { Account, AccountRequest, TransferTarget } from '../models/account.model';
+import { Account, AccountRequest } from '../models/account.model';
 
 @Injectable({ providedIn: 'root' })
 export class AccountService {
@@ -10,16 +10,9 @@ export class AccountService {
 
   constructor(private readonly http: HttpClient) {}
 
-  getAccounts(): Observable<Account[]> {
-    return this.http.get<Account[]>(this.baseUrl);
-  }
-
-  getMyAccounts(): Observable<Account[]> {
-    return this.http.get<Account[]>(`${this.baseUrl}/my`);
-  }
-
-  getTransferTargets(): Observable<TransferTarget[]> {
-    return this.http.get<TransferTarget[]>(`${environment.apiBaseUrl}/api/accounts/transfer-targets`);
+  getAccounts(userId?: number): Observable<Account[]> {
+    const params = userId == null ? undefined : new HttpParams().set('userId', String(userId));
+    return this.http.get<Account[]>(this.baseUrl, { params });
   }
 
   getAccountById(id: number): Observable<Account> {

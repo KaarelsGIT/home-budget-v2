@@ -1,4 +1,4 @@
-import { Component, inject, signal } from '@angular/core';
+import { Component, computed, inject, signal } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import {
   MAT_DIALOG_DATA,
@@ -14,12 +14,15 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatSelectModule } from '@angular/material/select';
 import { Account } from '../../core/models/account.model';
 import { Category } from '../../core/models/category.model';
-import { Transaction, TransactionRequest, TransactionType } from '../../core/models/transaction.model';
+import { Transaction, TransactionRequest, TransactionType, TransferRequestApi } from '../../core/models/transaction.model';
 import { CategoryService } from '../../core/services/category.service';
+import { AuthService } from '../../core/services/auth.service';
+import { UserSummary } from '../../core/models/user.model';
 
 export interface TransactionDialogData {
   transaction: Transaction | null;
   accounts: Account[];
+  users: UserSummary[];
 }
 
 @Component({
@@ -44,7 +47,7 @@ export interface TransactionDialogData {
           <mat-label>Type</mat-label>
           <mat-select formControlName="type" (valueChange)="onTypeChange($event)">
             @for (type of types; track type) {
-              <mat-option [value]="type">{{ type }}</mat-option>
+              <mat-option [value]="type">{{ typeLabel(type) }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -52,16 +55,6 @@ export interface TransactionDialogData {
         <mat-form-field>
           <mat-label>Amount</mat-label>
           <input matInput type="number" formControlName="amount" />
-        </mat-form-field>
-
-        <mat-form-field>
-          <mat-label>Date</mat-label>
-          <input matInput type="date" formControlName="date" />
-        </mat-form-field>
-
-        <mat-form-field>
-          <mat-label>Description</mat-label>
-          <input matInput formControlName="description" />
         </mat-form-field>
 
         @if (!isTransfer()) {
@@ -79,19 +72,34 @@ export interface TransactionDialogData {
           <mat-form-field>
             <mat-label>From Account</mat-label>
             <mat-select formControlName="fromAccountId">
-              @for (account of data.accounts; track account.id) {
-                <mat-option [value]="account.id">{{ account.name }}</mat-option>
+              @for (account of sourceAccounts(); track account.id) {
+                <mat-option [value]="account.id">{{ accountLabel(account) }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
         }
 
-        @if (!isExpense()) {
+        @if (isTransfer()) {
           <mat-form-field>
             <mat-label>To Account</mat-label>
             <mat-select formControlName="toAccountId">
-              @for (account of data.accounts; track account.id) {
-                <mat-option [value]="account.id">{{ account.name }}</mat-option>
+              @for (user of selectableTargetUsers(); track user.id) {
+                <mat-optgroup [label]="userLabel(user)">
+                  @for (account of targetAccountsByUser(user.id); track account.id) {
+                    <mat-option [value]="account.id">{{ account.name }}</mat-option>
+                  }
+                </mat-optgroup>
+              }
+            </mat-select>
+          </mat-form-field>
+        }
+
+        @if (!isExpense() && !isTransfer()) {
+          <mat-form-field>
+            <mat-label>To Account</mat-label>
+            <mat-select formControlName="toAccountId">
+              @for (account of incomeAccounts(); track account.id) {
+                <mat-option [value]="account.id">{{ accountLabel(account) }}</mat-option>
               }
             </mat-select>
           </mat-form-field>
@@ -108,6 +116,7 @@ export class TransactionFormDialogComponent {
   private readonly fb = inject(FormBuilder);
   private readonly dialogRef = inject(MatDialogRef<TransactionFormDialogComponent>);
   private readonly categoryService = inject(CategoryService);
+  private readonly authService = inject(AuthService);
   readonly data = inject<TransactionDialogData>(MAT_DIALOG_DATA);
 
   readonly types: TransactionType[] = ['INCOME', 'EXPENSE', 'TRANSFER'];
@@ -115,12 +124,17 @@ export class TransactionFormDialogComponent {
   readonly isIncome = signal(false);
   readonly isExpense = signal(true);
   readonly isTransfer = signal(false);
+  readonly currentUserId = this.authService.currentUser()?.userId ?? null;
+  readonly usersById = computed(() => new Map(this.data.users.map((user) => [user.id, user] as const)));
+  readonly sourceAccounts = computed(() => this.data.accounts.filter((account) => account.userId === this.currentUserId));
+  readonly incomeAccounts = computed(() => this.data.accounts);
+  readonly selectableTargetUsers = computed(() =>
+    this.data.users.filter((user) => this.targetAccountsByUser(user.id).length > 0)
+  );
 
   readonly form = this.fb.group({
     type: [this.data.transaction?.type ?? ('EXPENSE' as TransactionType), [Validators.required]],
     amount: [this.data.transaction?.amount ?? 0, [Validators.required, Validators.min(0.01)]],
-    date: [this.data.transaction?.date ?? new Date().toISOString().slice(0, 10), [Validators.required]],
-    description: [this.data.transaction?.description ?? ''],
     categoryId: [this.data.transaction?.categoryId ?? null],
     fromAccountId: [this.data.transaction?.fromAccountId ?? null],
     toAccountId: [this.data.transaction?.toAccountId ?? null]
@@ -144,9 +158,7 @@ export class TransactionFormDialogComponent {
       this.form.get('toAccountId')?.setValidators([Validators.required]);
     } else {
       const categoryType = type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-      this.categoryService.getCategoriesByType(categoryType).subscribe((items) => {
-        this.categories.set(items);
-      });
+      this.categoryService.getCategoriesByType(categoryType).subscribe((items) => this.categories.set(items));
 
       this.form.get('categoryId')?.setValidators([Validators.required]);
 
@@ -174,16 +186,42 @@ export class TransactionFormDialogComponent {
     const value = this.form.getRawValue();
     const type = (value.type ?? 'EXPENSE') as TransactionType;
 
+    if (type === 'TRANSFER') {
+      const payload: TransferRequestApi = {
+        fromAccountId: Number(value.fromAccountId),
+        toAccountId: Number(value.toAccountId),
+        amount: Number(value.amount ?? 0)
+      };
+      this.dialogRef.close({ transfer: payload });
+      return;
+    }
+
     const payload: TransactionRequest = {
       type,
       amount: Number(value.amount ?? 0),
-      date: value.date ?? new Date().toISOString().slice(0, 10),
-      description: value.description || null,
-      categoryId: type === 'TRANSFER' ? null : (value.categoryId ?? null),
+      categoryId: value.categoryId ?? null,
       fromAccountId: value.fromAccountId,
       toAccountId: value.toAccountId
     };
 
-    this.dialogRef.close(payload);
+    this.dialogRef.close({ transaction: payload });
+  }
+
+  targetAccountsByUser(userId: number): Account[] {
+    const selectedSourceId = this.form.get('fromAccountId')?.value;
+    return this.data.accounts.filter((account) => account.userId === userId && account.id !== selectedSourceId);
+  }
+
+  userLabel(user: UserSummary): string {
+    return user.username || user.email;
+  }
+
+  accountLabel(account: Account): string {
+    const user = this.usersById().get(account.userId);
+    return user ? `${account.name} (${this.userLabel(user)})` : account.name;
+  }
+
+  typeLabel(type: TransactionType): string {
+    return type.charAt(0) + type.slice(1).toLowerCase();
   }
 }

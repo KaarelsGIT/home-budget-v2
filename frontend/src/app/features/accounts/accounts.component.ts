@@ -38,7 +38,12 @@ import { AccountFormDialogComponent } from './account-form-dialog.component';
 
           <ng-container matColumnDef="balance">
             <th mat-header-cell *matHeaderCellDef>Balance</th>
-            <td mat-cell *matCellDef="let row">{{ row.balance | currency : row.currency }}</td>
+            <td mat-cell *matCellDef="let row">{{ row.balance | currency : 'EUR' }}</td>
+          </ng-container>
+
+          <ng-container matColumnDef="type">
+            <th mat-header-cell *matHeaderCellDef>Type</th>
+            <td mat-cell *matCellDef="let row">{{ row.type }}</td>
           </ng-container>
 
           <ng-container matColumnDef="actions">
@@ -61,7 +66,7 @@ import { AccountFormDialogComponent } from './account-form-dialog.component';
   `
 })
 export class AccountsComponent {
-  readonly displayedColumns = ['name', 'balance', 'actions'];
+  readonly displayedColumns = ['name', 'balance', 'type', 'actions'];
   readonly accounts = signal<Account[]>([]);
 
   constructor(
@@ -77,7 +82,9 @@ export class AccountsComponent {
   }
 
   openCreateDialog(): void {
-    const ref = this.dialog.open(AccountFormDialogComponent, { data: null });
+    const ref = this.dialog.open(AccountFormDialogComponent, {
+      data: { account: null, accounts: this.accounts() }
+    });
     ref.afterClosed().subscribe((payload: AccountRequest | undefined) => {
       if (!payload) {
         return;
@@ -90,7 +97,9 @@ export class AccountsComponent {
   }
 
   openEditDialog(account: Account): void {
-    const ref = this.dialog.open(AccountFormDialogComponent, { data: account });
+    const ref = this.dialog.open(AccountFormDialogComponent, {
+      data: { account, accounts: this.accounts() }
+    });
     ref.afterClosed().subscribe((payload: AccountRequest | undefined) => {
       if (!payload) {
         return;

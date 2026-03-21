@@ -4,25 +4,26 @@ export interface Transaction {
   id: number;
   type: TransactionType;
   amount: number;
-  date: string;
-  description?: string | null;
   userId: number;
   categoryId?: number | null;
   categoryName?: string | null;
   fromAccountId?: number | null;
   toAccountId?: number | null;
   createdAt: string;
-  updatedAt: string;
 }
 
 export interface TransactionRequest {
   type: TransactionType;
   amount: number;
-  date: string;
-  description?: string | null;
   categoryId?: number | null;
   fromAccountId?: number | null;
   toAccountId?: number | null;
+}
+
+export interface TransferRequestApi {
+  fromAccountId: number;
+  toAccountId: number;
+  amount: number;
 }
 
 export interface TransactionFilter {
@@ -31,6 +32,6 @@ export interface TransactionFilter {
   categoryId?: number;
   type?: TransactionType;
   accountId?: number;
-  sortBy?: 'date' | 'amount';
+  sortBy?: 'createdAt' | 'amount';
   direction?: 'ASC' | 'DESC';
 }

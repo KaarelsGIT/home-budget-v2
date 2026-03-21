@@ -6,7 +6,7 @@ import { Category, CategoryRequest, CategoryType } from '../models/category.mode
 
 @Injectable({ providedIn: 'root' })
 export class CategoryService {
-  private readonly baseUrl = `${environment.apiBaseUrl}/api/categories`;
+  private readonly baseUrl = `${environment.apiBaseUrl}/categories`;
 
   constructor(private readonly http: HttpClient) {}
 

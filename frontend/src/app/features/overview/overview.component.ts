@@ -119,10 +119,10 @@ import { FamilyOverviewResponse, OverviewMonthlyItem } from '../../core/models/r
   `,
   template: `
     <div class="header">
-      <h2>Pere ülevaade</h2>
+      <h2>Family Overview</h2>
       <form [formGroup]="filters" class="filters">
         <mat-form-field>
-          <mat-label>Aasta</mat-label>
+          <mat-label>Year</mat-label>
           <mat-select formControlName="year">
             @for (year of years; track year) {
               <mat-option [value]="year">{{ year }}</mat-option>
@@ -131,16 +131,16 @@ import { FamilyOverviewResponse, OverviewMonthlyItem } from '../../core/models/r
         </mat-form-field>
 
         <mat-form-field>
-          <mat-label>Kuu</mat-label>
+          <mat-label>Month</mat-label>
           <mat-select formControlName="month">
-            <mat-option [value]="null">Kõik kuud</mat-option>
+            <mat-option [value]="null">All months</mat-option>
             @for (month of months; track month.value) {
               <mat-option [value]="month.value">{{ month.label }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
 
-        <button mat-flat-button color="primary" type="button" (click)="reload()">Rakenda</button>
+        <button mat-flat-button color="primary" type="button" (click)="reload()">Apply</button>
       </form>
     </div>
 
@@ -149,26 +149,26 @@ import { FamilyOverviewResponse, OverviewMonthlyItem } from '../../core/models/r
     } @else {
       <section class="kpis">
         <div class="kpi">
-          <div class="label">Tulud</div>
+          <div class="label">Income</div>
           <div class="value">{{ report()?.totals?.income | currency: 'EUR' }}</div>
         </div>
         <div class="kpi">
-          <div class="label">Kulud</div>
+          <div class="label">Expense</div>
           <div class="value">{{ report()?.totals?.expense | currency: 'EUR' }}</div>
         </div>
         <div class="kpi">
-          <div class="label">Ülekanded</div>
+          <div class="label">Transfers</div>
           <div class="value">{{ report()?.totals?.transferOut | currency: 'EUR' }}</div>
         </div>
         <div class="kpi">
-          <div class="label">Neto</div>
+          <div class="label">Net</div>
           <div class="value">{{ report()?.totals?.net | currency: 'EUR' }}</div>
         </div>
       </section>
 
       <mat-card class="chart-card">
         <mat-card-header>
-          <mat-card-title>Jooksev aasta: kuu lõikes trend</mat-card-title>
+          <mat-card-title>Current Year Trend by Month</mat-card-title>
         </mat-card-header>
         <mat-card-content>
           <div class="bars">
@@ -190,7 +190,7 @@ import { FamilyOverviewResponse, OverviewMonthlyItem } from '../../core/models/r
 
       <mat-card class="table-card">
         <mat-card-header>
-          <mat-card-title>Kategooriate lõikes (professionaalne vaade)</mat-card-title>
+          <mat-card-title>Category Breakdown</mat-card-title>
         </mat-card-header>
         <mat-card-content>
           <table mat-table [dataSource]="report()?.categories ?? []" class="full-width">
@@ -203,11 +203,11 @@ import { FamilyOverviewResponse, OverviewMonthlyItem } from '../../core/models/r
               <td mat-cell *matCellDef="let row">{{ row.subCategory }}</td>
             </ng-container>
             <ng-container matColumnDef="income">
-              <th mat-header-cell *matHeaderCellDef>Tulud</th>
+              <th mat-header-cell *matHeaderCellDef>Income</th>
               <td mat-cell *matCellDef="let row">{{ row.income | currency: 'EUR' }}</td>
             </ng-container>
             <ng-container matColumnDef="expense">
-              <th mat-header-cell *matHeaderCellDef>Kulud</th>
+              <th mat-header-cell *matHeaderCellDef>Expense</th>
               <td mat-cell *matCellDef="let row">{{ row.expense | currency: 'EUR' }}</td>
             </ng-container>
 
@@ -219,24 +219,24 @@ import { FamilyOverviewResponse, OverviewMonthlyItem } from '../../core/models/r
 
       <mat-card>
         <mat-card-header>
-          <mat-card-title>Pere tehingud</mat-card-title>
+          <mat-card-title>Family Transactions</mat-card-title>
         </mat-card-header>
         <mat-card-content>
           <table mat-table [dataSource]="report()?.transactions ?? []" class="full-width">
             <ng-container matColumnDef="date">
-              <th mat-header-cell *matHeaderCellDef>Kuupäev</th>
-              <td mat-cell *matCellDef="let row">{{ row.date | date }}</td>
+              <th mat-header-cell *matHeaderCellDef>Date</th>
+              <td mat-cell *matCellDef="let row">{{ row.createdAt | date : 'short' }}</td>
             </ng-container>
             <ng-container matColumnDef="type">
-              <th mat-header-cell *matHeaderCellDef>Tüüp</th>
+              <th mat-header-cell *matHeaderCellDef>Type</th>
               <td mat-cell *matCellDef="let row">{{ row.type }}</td>
             </ng-container>
             <ng-container matColumnDef="category">
-              <th mat-header-cell *matHeaderCellDef>Kategooria</th>
+              <th mat-header-cell *matHeaderCellDef>Category</th>
               <td mat-cell *matCellDef="let row">{{ formatCategory(row) }}</td>
             </ng-container>
             <ng-container matColumnDef="amount">
-              <th mat-header-cell *matHeaderCellDef>Summa</th>
+              <th mat-header-cell *matHeaderCellDef>Amount</th>
               <td mat-cell *matCellDef="let row">{{ row.amount | currency: 'EUR' }}</td>
             </ng-container>
 
@@ -260,18 +260,18 @@ export class OverviewComponent {
 
   readonly years = Array.from({ length: 6 }, (_, i) => new Date().getFullYear() - i);
   readonly months = [
-    { value: 1, label: 'Jaanuar' },
-    { value: 2, label: 'Veebruar' },
-    { value: 3, label: 'Märts' },
-    { value: 4, label: 'Aprill' },
-    { value: 5, label: 'Mai' },
-    { value: 6, label: 'Juuni' },
-    { value: 7, label: 'Juuli' },
+    { value: 1, label: 'January' },
+    { value: 2, label: 'February' },
+    { value: 3, label: 'March' },
+    { value: 4, label: 'April' },
+    { value: 5, label: 'May' },
+    { value: 6, label: 'June' },
+    { value: 7, label: 'July' },
     { value: 8, label: 'August' },
     { value: 9, label: 'September' },
-    { value: 10, label: 'Oktoober' },
+    { value: 10, label: 'October' },
     { value: 11, label: 'November' },
-    { value: 12, label: 'Detsember' }
+    { value: 12, label: 'December' }
   ];
 
   readonly filters = this.fb.group({
