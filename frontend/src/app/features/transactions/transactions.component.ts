@@ -1,188 +1,67 @@
 import { Component, inject, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
-import { FormBuilder, ReactiveFormsModule } from '@angular/forms';
-import { forkJoin } from 'rxjs';
-import { MatCardModule } from '@angular/material/card';
-import { MatTableModule } from '@angular/material/table';
+import { CurrencyPipe, DatePipe } from '@angular/common';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
-import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatSelectModule } from '@angular/material/select';
-import { MatTooltipModule } from '@angular/material/tooltip';
-import { TransactionService } from '../../core/services/transaction.service';
+import { forkJoin } from 'rxjs';
+import { Account } from '../../core/models/account.model';
+import { Category, SubCategory } from '../../core/models/category.model';
+import { Transaction, TransactionType } from '../../core/models/transaction.model';
 import { AccountService } from '../../core/services/account.service';
 import { CategoryService } from '../../core/services/category.service';
-import { UserService } from '../../core/services/user.service';
-import { Account } from '../../core/models/account.model';
-import { Category } from '../../core/models/category.model';
-import { Transaction, TransactionRequest, TransactionType, TransferRequestApi } from '../../core/models/transaction.model';
-import { UserSummary } from '../../core/models/user.model';
-import { SignedAmountPipe } from '../../shared/pipes/signed-amount.pipe';
-import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
-import { TransactionFormDialogComponent } from './transaction-form-dialog.component';
+import { TransactionService } from '../../core/services/transaction.service';
+import { I18nPipe } from '../../shared/pipes/i18n.pipe';
 
 @Component({
   selector: 'app-transactions',
   standalone: true,
-  imports: [
-    ReactiveFormsModule,
-    MatCardModule,
-    MatTableModule,
-    MatButtonModule,
-    MatIconModule,
-    MatDialogModule,
-    MatSnackBarModule,
-    MatFormFieldModule,
-    MatInputModule,
-    MatSelectModule,
-    MatTooltipModule,
-    DatePipe,
-    SignedAmountPipe
-  ],
-  styles: `
-    .toolbar {
-      display: grid;
-      grid-template-columns: repeat(6, minmax(120px, 1fr));
-      gap: 12px;
-      margin-bottom: 16px;
-    }
-
-    .controls {
-      display: flex;
-      gap: 8px;
-      margin-bottom: 16px;
-      flex-wrap: wrap;
-    }
-
-    .transaction-income {
-      color: #1c8b4b;
-      font-weight: 600;
-    }
-
-    .transaction-expense {
-      color: #c0392b;
-      font-weight: 600;
-    }
-
-    .transaction-transfer {
-      color: #1769aa;
-      font-weight: 600;
-    }
-
-    @media (max-width: 980px) {
-      .toolbar {
-        grid-template-columns: repeat(2, minmax(120px, 1fr));
-      }
-    }
-  `,
+  imports: [ReactiveFormsModule, CurrencyPipe, DatePipe, MatButtonModule, MatCardModule, MatFormFieldModule, MatInputModule, MatSelectModule, I18nPipe],
   template: `
     <mat-card>
-      <mat-card-header>
-        <mat-card-title>Transactions</mat-card-title>
-      </mat-card-header>
+      <mat-card-header><mat-card-title>{{ 'transactions.title' | i18n }}</mat-card-title></mat-card-header>
       <mat-card-content>
-        <form [formGroup]="filterForm" class="toolbar">
+        <form [formGroup]="form" (ngSubmit)="create()" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px;">
           <mat-form-field>
-            <mat-label>Start Date</mat-label>
-            <input matInput type="date" formControlName="startDate" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>End Date</mat-label>
-            <input matInput type="date" formControlName="endDate" />
-          </mat-form-field>
-
-          <mat-form-field>
-            <mat-label>Type</mat-label>
-            <mat-select formControlName="type" (valueChange)="onFilterTypeChange($event)">
-              <mat-option [value]="null">All</mat-option>
-              @for (type of types; track type) {
-                <mat-option [value]="type">{{ typeLabel(type) }}</mat-option>
-              }
+            <mat-label>{{ 'common.type' | i18n }}</mat-label>
+            <mat-select formControlName="type">
+              <mat-option value="INCOME">{{ 'transactions.income' | i18n }}</mat-option>
+              <mat-option value="EXPENSE">{{ 'transactions.expense' | i18n }}</mat-option>
+              <mat-option value="TRANSFER">{{ 'transactions.transfer' | i18n }}</mat-option>
             </mat-select>
           </mat-form-field>
-
+          <mat-form-field><mat-label>{{ 'common.amount' | i18n }}</mat-label><input matInput type="number" formControlName="amount" /></mat-form-field>
           <mat-form-field>
-            <mat-label>Category</mat-label>
-            <mat-select formControlName="categoryId">
-              <mat-option [value]="null">All</mat-option>
-              @for (category of filterCategories(); track category.id) {
-                <mat-option [value]="category.id">{{ category.name }}</mat-option>
-              }
+            <mat-label>{{ 'transactions.sourceAccount' | i18n }}</mat-label>
+            <mat-select formControlName="fromAccountId">
+              @for (account of accounts(); track account.id) { <mat-option [value]="account.id">{{ account.name }}</mat-option> }
             </mat-select>
           </mat-form-field>
-
           <mat-form-field>
-            <mat-label>Account</mat-label>
-            <mat-select formControlName="accountId">
-              <mat-option [value]="null">All</mat-option>
-              @for (account of accounts(); track account.id) {
-                <mat-option [value]="account.id">{{ account.name }}</mat-option>
-              }
+            <mat-label>{{ 'transactions.destinationAccount' | i18n }}</mat-label>
+            <mat-select formControlName="toAccountId">
+              @for (account of accounts(); track account.id) { <mat-option [value]="account.id">{{ account.name }}</mat-option> }
             </mat-select>
           </mat-form-field>
-
           <mat-form-field>
-            <mat-label>Sort</mat-label>
-            <mat-select formControlName="sortBy">
-              <mat-option value="createdAt">Date</mat-option>
-              <mat-option value="amount">Amount</mat-option>
+            <mat-label>{{ 'transactions.subCategory' | i18n }}</mat-label>
+            <mat-select formControlName="subCategoryId">
+              @for (sub of subCategories(); track sub.id) { <mat-option [value]="sub.id">{{ sub.parentCategoryName }} / {{ sub.name }}</mat-option> }
             </mat-select>
           </mat-form-field>
+          <button mat-flat-button type="submit">{{ 'transactions.create' | i18n }}</button>
         </form>
 
-        <div class="controls">
-          <button mat-flat-button color="primary" (click)="applyFilters()">Apply Filters</button>
-          <button mat-button (click)="resetFilters()">Reset</button>
-          <button mat-flat-button color="accent" (click)="openCreateDialog()">Add Transaction</button>
-        </div>
-
-        <table mat-table [dataSource]="transactions()" class="full-width">
-          <ng-container matColumnDef="createdAt">
-            <th mat-header-cell *matHeaderCellDef>Date</th>
-            <td mat-cell *matCellDef="let row">{{ row.createdAt | date : 'short' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="type">
-            <th mat-header-cell *matHeaderCellDef>Type</th>
-            <td mat-cell *matCellDef="let row">
-              <span [class]="typeClass(row.type)">{{ typeLabel(row.type) }}</span>
-            </td>
-          </ng-container>
-
-          <ng-container matColumnDef="category">
-            <th mat-header-cell *matHeaderCellDef>Category</th>
-            <td mat-cell *matCellDef="let row">{{ row.categoryName || '-' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="amount">
-            <th mat-header-cell *matHeaderCellDef>Amount</th>
-            <td mat-cell *matCellDef="let row">{{ row.amount | signedAmount : row.type }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="accounts">
-            <th mat-header-cell *matHeaderCellDef>Accounts</th>
-            <td mat-cell *matCellDef="let row">{{ accountFlowLabel(row) }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let row">
-              <button mat-icon-button matTooltip="Edit" aria-label="Edit transaction" (click)="openEditDialog(row)">
-                <mat-icon>edit</mat-icon>
-              </button>
-              <button mat-icon-button color="warn" matTooltip="Delete" aria-label="Delete transaction" (click)="deleteTransaction(row.id)">
-                <mat-icon>delete</mat-icon>
-              </button>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-        </table>
+        @for (transaction of transactions(); track transaction.id) {
+          <mat-card style="margin-bottom:12px;">
+            <mat-card-title>{{ transaction.type }} · {{ transaction.amount | currency:'EUR' }}</mat-card-title>
+            <mat-card-subtitle>{{ transaction.createdAt | date:'short' }} · {{ transaction.createdByUsername }}</mat-card-subtitle>
+            <mat-card-content>{{ transaction.categoryName }} / {{ transaction.subCategoryName }}</mat-card-content>
+            <mat-card-actions><button mat-button (click)="remove(transaction.id)">{{ 'common.delete' | i18n }}</button></mat-card-actions>
+          </mat-card>
+        }
       </mat-card-content>
     </mat-card>
   `
@@ -192,192 +71,45 @@ export class TransactionsComponent {
   private readonly transactionService = inject(TransactionService);
   private readonly accountService = inject(AccountService);
   private readonly categoryService = inject(CategoryService);
-  private readonly userService = inject(UserService);
-  private readonly dialog = inject(MatDialog);
-  private readonly snackBar = inject(MatSnackBar);
 
-  readonly displayedColumns = ['createdAt', 'type', 'category', 'accounts', 'amount', 'actions'];
-  readonly types: TransactionType[] = ['INCOME', 'EXPENSE', 'TRANSFER'];
-  readonly transactions = signal<Transaction[]>([]);
   readonly accounts = signal<Account[]>([]);
-  readonly users = signal<UserSummary[]>([]);
-  readonly filterCategories = signal<Category[]>([]);
-
-  readonly filterForm = this.fb.group({
-    startDate: [''],
-    endDate: [''],
-    type: [null as TransactionType | null],
-    categoryId: [null as number | null],
-    accountId: [null as number | null],
-    sortBy: ['createdAt' as 'createdAt' | 'amount'],
-    direction: ['DESC' as 'ASC' | 'DESC']
+  readonly transactions = signal<Transaction[]>([]);
+  readonly categories = signal<Category[]>([]);
+  readonly subCategories = signal<SubCategory[]>([]);
+  readonly form = this.fb.nonNullable.group({
+    type: ['EXPENSE' as TransactionType, Validators.required],
+    amount: [0, Validators.min(0.01)],
+    fromAccountId: [null as number | null],
+    toAccountId: [null as number | null],
+    subCategoryId: [null as number | null]
   });
 
   constructor() {
-    this.loadDependencies();
+    this.load();
   }
 
-  private loadDependencies(): void {
+  create(): void {
+    const value = this.form.getRawValue();
+    this.transactionService.createTransaction(value).subscribe(() => {
+      this.form.reset({ type: 'EXPENSE', amount: 0, fromAccountId: null, toAccountId: null, subCategoryId: null });
+      this.load();
+    });
+  }
+
+  remove(id: number): void {
+    this.transactionService.deleteTransaction(id).subscribe(() => this.load());
+  }
+
+  private load(): void {
     forkJoin({
-      transactions: this.transactionService.getTransactions(),
       accounts: this.accountService.getAccounts(),
-      users: this.userService.getUsers(),
-      incomeCategories: this.categoryService.getCategoriesByType('INCOME'),
-      expenseCategories: this.categoryService.getCategoriesByType('EXPENSE')
-    }).subscribe(({ transactions, accounts, users, incomeCategories, expenseCategories }) => {
-      this.transactions.set(transactions);
+      transactions: this.transactionService.getTransactions(),
+      categories: this.categoryService.getCategories()
+    }).subscribe(({ accounts, transactions, categories }) => {
       this.accounts.set(accounts);
-      this.users.set(users);
-      this.filterCategories.set([...incomeCategories, ...expenseCategories]);
+      this.transactions.set(transactions);
+      this.categories.set(categories);
+      this.subCategories.set(categories.flatMap((category) => category.subCategories));
     });
-  }
-
-  onFilterTypeChange(type: TransactionType | null): void {
-    this.filterForm.patchValue({ categoryId: null });
-
-    if (!type || type === 'TRANSFER') {
-      this.categoryService.getCategories().subscribe((categories) => this.filterCategories.set(categories));
-      return;
-    }
-
-    const categoryType = type === 'INCOME' ? 'INCOME' : 'EXPENSE';
-    this.categoryService.getCategoriesByType(categoryType).subscribe((categories) => this.filterCategories.set(categories));
-  }
-
-  applyFilters(): void {
-    const value = this.filterForm.getRawValue();
-
-    this.transactionService
-      .filterTransactions({
-        startDate: value.startDate || undefined,
-        endDate: value.endDate || undefined,
-        type: value.type ?? undefined,
-        categoryId: value.categoryId ?? undefined,
-        accountId: value.accountId ?? undefined,
-        sortBy: value.sortBy ?? 'createdAt',
-        direction: value.direction ?? 'DESC'
-      })
-      .subscribe((rows) => this.transactions.set(rows));
-  }
-
-  resetFilters(): void {
-    this.filterForm.reset({
-      startDate: '',
-      endDate: '',
-      type: null,
-      categoryId: null,
-      accountId: null,
-      sortBy: 'createdAt',
-      direction: 'DESC'
-    });
-
-    this.loadDependencies();
-  }
-
-  openCreateDialog(): void {
-    const ref = this.dialog.open(TransactionFormDialogComponent, {
-      data: {
-        transaction: null,
-        accounts: this.accounts(),
-        users: this.users()
-      },
-      width: '620px'
-    });
-
-    ref.afterClosed().subscribe((payload: { transaction?: TransactionRequest; transfer?: TransferRequestApi } | undefined) => {
-      if (!payload) {
-        return;
-      }
-
-      if (payload.transfer) {
-        this.transactionService.transfer(payload.transfer).subscribe(() => {
-          this.snackBar.open('Transfer created', 'Close', { duration: 2500 });
-          this.loadDependencies();
-        });
-        return;
-      }
-
-      if (payload.transaction) {
-        this.transactionService.createTransaction(payload.transaction).subscribe(() => {
-          this.snackBar.open('Transaction created', 'Close', { duration: 2500 });
-          this.loadDependencies();
-        });
-      }
-    });
-  }
-
-  openEditDialog(transaction: Transaction): void {
-    const ref = this.dialog.open(TransactionFormDialogComponent, {
-      data: {
-        transaction,
-        accounts: this.accounts(),
-        users: this.users()
-      },
-      width: '620px'
-    });
-
-    ref.afterClosed().subscribe((payload: { transaction?: TransactionRequest; transfer?: TransferRequestApi } | undefined) => {
-      if (!payload || !payload.transaction) {
-        return;
-      }
-
-      this.transactionService.updateTransaction(transaction.id, payload.transaction).subscribe(() => {
-        this.snackBar.open('Transaction updated', 'Close', { duration: 2500 });
-        this.loadDependencies();
-      });
-    });
-  }
-
-  deleteTransaction(transactionId: number): void {
-    const ref = this.dialog.open(ConfirmDialogComponent, {
-      data: {
-        title: 'Delete Transaction',
-        message: `Delete transaction #${transactionId}?`
-      }
-    });
-
-    ref.afterClosed().subscribe((confirmed: boolean) => {
-      if (!confirmed) {
-        return;
-      }
-
-      this.transactionService.deleteTransaction(transactionId).subscribe(() => {
-        this.snackBar.open('Transaction deleted', 'Close', { duration: 2500 });
-        this.loadDependencies();
-      });
-    });
-  }
-
-  typeClass(type: TransactionType): string {
-    return `transaction-${type.toLowerCase()}`;
-  }
-
-  typeLabel(type: TransactionType): string {
-    return type.charAt(0) + type.slice(1).toLowerCase();
-  }
-
-  accountFlowLabel(transaction: Transaction): string {
-    if (transaction.type === 'INCOME') {
-      return this.accountName(transaction.toAccountId) ?? '-';
-    }
-    if (transaction.type === 'EXPENSE') {
-      return this.accountName(transaction.fromAccountId) ?? '-';
-    }
-
-    return `${this.accountName(transaction.fromAccountId) ?? '-'} -> ${this.accountName(transaction.toAccountId) ?? '-'}`;
-  }
-
-  private accountName(accountId?: number | null): string | null {
-    if (accountId == null) {
-      return null;
-    }
-
-    const account = this.accounts().find((item) => item.id === accountId);
-    if (!account) {
-      return null;
-    }
-
-    const user = this.users().find((item) => item.id === account.userId);
-    return user ? `${account.name} (${user.username || user.email})` : account.name;
   }
 }

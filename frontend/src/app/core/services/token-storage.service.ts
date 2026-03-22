@@ -1,7 +1,8 @@
 import { Injectable } from '@angular/core';
-import { AuthUser } from '../models/auth.model';
+import { AuthUser, LanguageCode } from '../models/auth.model';
 
 const AUTH_STORAGE_KEY = 'home-budget-auth';
+const LANGUAGE_STORAGE_KEY = 'home-budget-language';
 
 @Injectable({ providedIn: 'root' })
 export class TokenStorageService {
@@ -10,15 +11,14 @@ export class TokenStorageService {
   }
 
   getAuth(): AuthUser | null {
-    const rawValue = localStorage.getItem(AUTH_STORAGE_KEY);
-    if (!rawValue) {
+    const raw = localStorage.getItem(AUTH_STORAGE_KEY);
+    if (!raw) {
       return null;
     }
-
     try {
-      return JSON.parse(rawValue) as AuthUser;
+      return JSON.parse(raw) as AuthUser;
     } catch {
-      this.clear();
+      this.clearAuth();
       return null;
     }
   }
@@ -27,7 +27,19 @@ export class TokenStorageService {
     return this.getAuth()?.token ?? null;
   }
 
-  clear(): void {
+  clearAuth(): void {
     localStorage.removeItem(AUTH_STORAGE_KEY);
+  }
+
+  saveLanguage(language: LanguageCode): void {
+    localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
+  }
+
+  getLanguage(): LanguageCode | null {
+    const value = localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    if (value === 'en' || value === 'et' || value === 'fi') {
+      return value;
+    }
+    return null;
   }
 }

@@ -11,35 +11,34 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/accounts", "/api/accounts"})
+@RequestMapping("/accounts")
 @RequiredArgsConstructor
 public class AccountController {
 
     private final AccountService accountService;
 
     @GetMapping
-    public ResponseEntity<List<AccountResponse>> getAll(@RequestParam(required = false) Long userId) {
-        return ResponseEntity.ok(accountService.getAll(userId));
+    public ResponseEntity<List<AccountResponse>> getAccounts(@RequestParam(required = false) Long ownerId) {
+        return ResponseEntity.ok(accountService.getAccounts(ownerId));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<AccountResponse> getById(@PathVariable Long id) {
+    public ResponseEntity<AccountResponse> getAccount(@PathVariable Long id) {
         return ResponseEntity.ok(accountService.getById(id));
     }
 
     @PostMapping
-    public ResponseEntity<AccountResponse> create(@Valid @RequestBody AccountRequest request,
-                                                  @RequestParam(required = false) Long userId) {
-        return ResponseEntity.ok(accountService.create(request, userId));
+    public ResponseEntity<AccountResponse> createAccount(@Valid @RequestBody AccountRequest request) {
+        return ResponseEntity.ok(accountService.create(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<AccountResponse> update(@PathVariable Long id, @Valid @RequestBody AccountRequest request) {
+    public ResponseEntity<AccountResponse> updateAccount(@PathVariable Long id, @Valid @RequestBody AccountRequest request) {
         return ResponseEntity.ok(accountService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteAccount(@PathVariable Long id) {
         accountService.delete(id);
         return ResponseEntity.noContent().build();
     }

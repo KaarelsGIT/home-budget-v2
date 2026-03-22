@@ -1,22 +1,34 @@
 package ee.kaarel.homebudgetappv2.config;
 
+import org.springframework.context.MessageSource;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.support.ReloadableResourceBundleMessageSource;
 import org.springframework.data.web.config.EnableSpringDataWebSupport;
-import org.springframework.web.servlet.config.annotation.CorsRegistry;
-import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
+import org.springframework.web.servlet.LocaleResolver;
+import org.springframework.web.servlet.i18n.AcceptHeaderLocaleResolver;
+
+import java.util.List;
+import java.util.Locale;
 
 @Configuration
 @EnableSpringDataWebSupport(pageSerializationMode = EnableSpringDataWebSupport.PageSerializationMode.VIA_DTO)
-public class AppConfig implements WebMvcConfigurer {
+public class AppConfig {
 
-    @Override
-    public void addCorsMappings(@SuppressWarnings("null") CorsRegistry registry) {
-    registry.addMapping("/**")
-            .allowedOrigins(
-                    "http://localhost:4200"
-            )
-            .allowedMethods("GET", "POST", "PUT", "DELETE")
-            .allowedHeaders("*");
+    @Bean
+    public MessageSource messageSource() {
+        ReloadableResourceBundleMessageSource messageSource = new ReloadableResourceBundleMessageSource();
+        messageSource.setBasename("classpath:messages");
+        messageSource.setDefaultEncoding("UTF-8");
+        messageSource.setFallbackToSystemLocale(false);
+        return messageSource;
     }
 
+    @Bean
+    public LocaleResolver localeResolver() {
+        AcceptHeaderLocaleResolver resolver = new AcceptHeaderLocaleResolver();
+        resolver.setDefaultLocale(Locale.ENGLISH);
+        resolver.setSupportedLocales(List.of(Locale.ENGLISH, new Locale("et"), new Locale("fi")));
+        return resolver;
+    }
 }

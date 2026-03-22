@@ -1,15 +1,15 @@
 package ee.kaarel.homebudgetappv2.dto;
 
-import ee.kaarel.homebudgetappv2.model.CategoryType;
-import lombok.Getter;
-import lombok.Setter;
+import ee.kaarel.homebudgetappv2.model.CategoryGroup;
 
-@Getter
-@Setter
-public class CategoryResponse {
-    private Long id;
-    private String name;
-    private CategoryType type;
-    private Long parentId;
-    private Long userId;
+import java.util.List;
+import java.util.UUID;
+
+public record CategoryResponse(
+        Long id,
+        String name,
+        CategoryGroup group,
+        UUID ownerFamilyId,
+        List<SubCategoryResponse> subCategories
+) {
 }

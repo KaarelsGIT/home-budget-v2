@@ -2,36 +2,33 @@ export type TransactionType = 'INCOME' | 'EXPENSE' | 'TRANSFER';
 
 export interface Transaction {
   id: number;
-  type: TransactionType;
   amount: number;
-  userId: number;
-  categoryId?: number | null;
+  type: TransactionType;
+  fromAccountId?: number | null;
+  fromAccountName?: string | null;
+  toAccountId?: number | null;
+  toAccountName?: string | null;
+  subCategoryId?: number | null;
+  subCategoryName?: string | null;
   categoryName?: string | null;
-  fromAccountId?: number | null;
-  toAccountId?: number | null;
   createdAt: string;
+  createdById: number;
+  createdByUsername: string;
 }
 
-export interface TransactionRequest {
+export interface CreateTransactionRequest {
   type: TransactionType;
   amount: number;
-  categoryId?: number | null;
   fromAccountId?: number | null;
   toAccountId?: number | null;
-}
-
-export interface TransferRequestApi {
-  fromAccountId: number;
-  toAccountId: number;
-  amount: number;
+  subCategoryId?: number | null;
 }
 
 export interface TransactionFilter {
   startDate?: string;
   endDate?: string;
-  categoryId?: number;
+  subCategoryId?: number;
   type?: TransactionType;
   accountId?: number;
-  sortBy?: 'createdAt' | 'amount';
-  direction?: 'ASC' | 'DESC';
+  userId?: number;
 }

@@ -3,6 +3,7 @@ package ee.kaarel.homebudgetappv2.controller;
 import ee.kaarel.homebudgetappv2.dto.AuthResponse;
 import ee.kaarel.homebudgetappv2.dto.LoginRequest;
 import ee.kaarel.homebudgetappv2.dto.RegisterRequest;
+import ee.kaarel.homebudgetappv2.dto.UserDTO;
 import ee.kaarel.homebudgetappv2.service.AuthService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -17,7 +18,7 @@ public class AuthController {
     private final AuthService authService;
 
     @PostMapping("/register")
-    public ResponseEntity<AuthResponse> register(@Valid @RequestBody RegisterRequest request) {
+    public ResponseEntity<UserDTO> register(@Valid @RequestBody RegisterRequest request) {
         return ResponseEntity.ok(authService.register(request));
     }
 

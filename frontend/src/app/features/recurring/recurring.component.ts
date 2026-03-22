@@ -1,152 +1,119 @@
-import { Component, signal } from '@angular/core';
-import { DatePipe } from '@angular/common';
-import { forkJoin } from 'rxjs';
-import { MatCardModule } from '@angular/material/card';
-import { MatTableModule } from '@angular/material/table';
+import { Component, inject, signal } from '@angular/core';
+import { CurrencyPipe } from '@angular/common';
+import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
-import { MatIconModule } from '@angular/material/icon';
+import { MatCardModule } from '@angular/material/card';
 import { MatDialog, MatDialogModule } from '@angular/material/dialog';
-import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatSelectModule } from '@angular/material/select';
+import { forkJoin } from 'rxjs';
 import { AccountService } from '../../core/services/account.service';
 import { CategoryService } from '../../core/services/category.service';
 import { RecurringService } from '../../core/services/recurring.service';
+import { TransactionService } from '../../core/services/transaction.service';
 import { Account } from '../../core/models/account.model';
-import { Category } from '../../core/models/category.model';
-import { RecurringTransaction, RecurringTransactionRequest } from '../../core/models/recurring.model';
-import { ConfirmDialogComponent } from '../../shared/components/confirm-dialog.component';
-import { RecurringFormDialogComponent } from './recurring-form-dialog.component';
+import { RecurringPayment, RecurringPaymentNotification } from '../../core/models/recurring.model';
+import { SubCategory } from '../../core/models/category.model';
+import { PayRecurringDialogComponent } from './pay-recurring-dialog.component';
+import { I18nPipe } from '../../shared/pipes/i18n.pipe';
 
 @Component({
   selector: 'app-recurring',
   standalone: true,
-  imports: [MatCardModule, MatTableModule, MatButtonModule, MatIconModule, MatDialogModule, MatSnackBarModule, DatePipe],
+  imports: [ReactiveFormsModule, CurrencyPipe, MatButtonModule, MatCardModule, MatDialogModule, MatFormFieldModule, MatInputModule, MatSelectModule, I18nPipe],
   template: `
     <mat-card>
-      <mat-card-header>
-        <mat-card-title>Recurring Payments</mat-card-title>
-        <button mat-flat-button color="primary" (click)="openCreateDialog()">Add Recurring</button>
-      </mat-card-header>
+      <mat-card-header><mat-card-title>{{ 'recurring.title' | i18n }}</mat-card-title></mat-card-header>
       <mat-card-content>
-        <h3>Upcoming Payments</h3>
-        <table mat-table [dataSource]="upcoming()" class="full-width">
-          <ng-container matColumnDef="amount">
-            <th mat-header-cell *matHeaderCellDef>Amount</th>
-            <td mat-cell *matCellDef="let row">{{ row.amount }}</td>
-          </ng-container>
+        <form [formGroup]="form" (ngSubmit)="create()" style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px;">
+          <mat-form-field><mat-label>{{ 'common.name' | i18n }}</mat-label><input matInput formControlName="name" /></mat-form-field>
+          <mat-form-field><mat-label>{{ 'common.amount' | i18n }}</mat-label><input matInput type="number" formControlName="amount" /></mat-form-field>
+          <mat-form-field><mat-label>{{ 'transactions.subCategory' | i18n }}</mat-label><mat-select formControlName="subCategoryId">@for (sub of subCategories(); track sub.id) { <mat-option [value]="sub.id">{{ sub.parentCategoryName }} / {{ sub.name }}</mat-option> }</mat-select></mat-form-field>
+          <mat-form-field><mat-label>{{ 'common.dueDay' | i18n }}</mat-label><input matInput type="number" formControlName="dueDay" /></mat-form-field>
+          <button mat-flat-button type="submit">{{ 'recurring.add' | i18n }}</button>
+        </form>
 
-          <ng-container matColumnDef="frequency">
-            <th mat-header-cell *matHeaderCellDef>Frequency</th>
-            <td mat-cell *matCellDef="let row">{{ row.frequency }}</td>
-          </ng-container>
+        <h3>{{ 'recurring.notifications' | i18n }}</h3>
+        @for (notification of notifications(); track notification.recurringPaymentId) {
+          <mat-card style="margin-bottom:12px;">
+            <mat-card-title>{{ notification.name }} · {{ notification.amount | currency:'EUR' }}</mat-card-title>
+            <mat-card-subtitle>{{ notification.categoryName }} / {{ notification.subCategoryName }}</mat-card-subtitle>
+            <mat-card-actions><button mat-flat-button (click)="pay(notification)">{{ 'common.pay' | i18n }}</button></mat-card-actions>
+          </mat-card>
+        } @empty { <p>{{ 'common.noData' | i18n }}</p> }
 
-          <ng-container matColumnDef="nextExecutionDate">
-            <th mat-header-cell *matHeaderCellDef>Next Date</th>
-            <td mat-cell *matCellDef="let row">{{ row.nextExecutionDate | date }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="active">
-            <th mat-header-cell *matHeaderCellDef>Active</th>
-            <td mat-cell *matCellDef="let row">{{ row.active ? 'Yes' : 'No' }}</td>
-          </ng-container>
-
-          <ng-container matColumnDef="actions">
-            <th mat-header-cell *matHeaderCellDef></th>
-            <td mat-cell *matCellDef="let row">
-              <button mat-icon-button (click)="openEditDialog(row)">
-                <mat-icon>edit</mat-icon>
-              </button>
-              <button mat-icon-button color="warn" (click)="deleteRecurring(row)">
-                <mat-icon>delete</mat-icon>
-              </button>
-            </td>
-          </ng-container>
-
-          <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-          <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-        </table>
+        <h3>{{ 'recurring.title' | i18n }}</h3>
+        @for (payment of payments(); track payment.id) {
+          <mat-card style="margin-bottom:12px;">
+            <mat-card-title>{{ payment.name }} · {{ payment.amount | currency:'EUR' }}</mat-card-title>
+            <mat-card-subtitle>{{ payment.ownerUsername }} · {{ payment.dueDay }}</mat-card-subtitle>
+          </mat-card>
+        }
       </mat-card-content>
     </mat-card>
   `
 })
 export class RecurringComponent {
-  readonly displayedColumns = ['amount', 'frequency', 'nextExecutionDate', 'active', 'actions'];
-  readonly recurring = signal<RecurringTransaction[]>([]);
-  readonly upcoming = signal<RecurringTransaction[]>([]);
+  private readonly fb = inject(FormBuilder);
+  private readonly recurringService = inject(RecurringService);
+  private readonly categoryService = inject(CategoryService);
+  private readonly accountService = inject(AccountService);
+  private readonly transactionService = inject(TransactionService);
+  private readonly dialog = inject(MatDialog);
+
+  readonly payments = signal<RecurringPayment[]>([]);
+  readonly notifications = signal<RecurringPaymentNotification[]>([]);
+  readonly subCategories = signal<SubCategory[]>([]);
   readonly accounts = signal<Account[]>([]);
-  readonly categories = signal<Category[]>([]);
+  readonly form = this.fb.nonNullable.group({
+    name: ['', Validators.required],
+    amount: [0, Validators.min(0.01)],
+    subCategoryId: [0, Validators.required],
+    dueDay: [1, Validators.min(1)]
+  });
 
-  constructor(
-    private readonly recurringService: RecurringService,
-    private readonly accountService: AccountService,
-    private readonly categoryService: CategoryService,
-    private readonly dialog: MatDialog,
-    private readonly snackBar: MatSnackBar
-  ) {
-    this.loadData();
+  constructor() {
+    this.load();
   }
 
-  loadData(): void {
+  create(): void {
+    const value = this.form.getRawValue();
+    this.recurringService.createRecurringPayment({
+      name: value.name,
+      amount: value.amount,
+      subCategoryId: value.subCategoryId,
+      dueDay: value.dueDay,
+      active: true
+    }).subscribe(() => {
+      this.form.reset({ name: '', amount: 0, subCategoryId: 0, dueDay: 1 });
+      this.load();
+    });
+  }
+
+  pay(notification: RecurringPaymentNotification): void {
+    const dialogRef = this.dialog.open(PayRecurringDialogComponent, {
+      data: { notification, accounts: this.accounts(), subCategories: this.subCategories() }
+    });
+    dialogRef.afterClosed().subscribe((payload) => {
+      if (!payload) return;
+      this.transactionService.createTransaction(payload).subscribe((transaction) => {
+        this.recurringService.markPaid(notification.recurringPaymentId, transaction.id).subscribe(() => this.load());
+      });
+    });
+  }
+
+  private load(): void {
     forkJoin({
-      recurring: this.recurringService.getRecurring(),
-      upcoming: this.recurringService.getUpcomingRecurring(),
-      accounts: this.accountService.getAccounts(),
-      categories: this.categoryService.getCategories()
-    }).subscribe(({ recurring, upcoming, accounts, categories }) => {
-      this.recurring.set(recurring);
-      this.upcoming.set(upcoming);
+      payments: this.recurringService.getRecurringPayments(),
+      notifications: this.recurringService.getNotifications(),
+      categories: this.categoryService.getCategories(),
+      accounts: this.accountService.getAccounts()
+    }).subscribe(({ payments, notifications, categories, accounts }) => {
+      this.payments.set(payments);
+      this.notifications.set(notifications);
       this.accounts.set(accounts);
-      this.categories.set(categories);
-    });
-  }
-
-  openCreateDialog(): void {
-    const ref = this.dialog.open(RecurringFormDialogComponent, {
-      data: { recurring: null, categories: this.categories(), accounts: this.accounts() }
-    });
-
-    ref.afterClosed().subscribe((payload: RecurringTransactionRequest | undefined) => {
-      if (!payload) {
-        return;
-      }
-
-      this.recurringService.createRecurring(payload).subscribe(() => {
-        this.snackBar.open('Recurring transaction created', 'Close', { duration: 2500 });
-        this.loadData();
-      });
-    });
-  }
-
-  openEditDialog(item: RecurringTransaction): void {
-    const ref = this.dialog.open(RecurringFormDialogComponent, {
-      data: { recurring: item, categories: this.categories(), accounts: this.accounts() }
-    });
-
-    ref.afterClosed().subscribe((payload: RecurringTransactionRequest | undefined) => {
-      if (!payload) {
-        return;
-      }
-
-      this.recurringService.updateRecurring(item.id, payload).subscribe(() => {
-        this.snackBar.open('Recurring transaction updated', 'Close', { duration: 2500 });
-        this.loadData();
-      });
-    });
-  }
-
-  deleteRecurring(item: RecurringTransaction): void {
-    const ref = this.dialog.open(ConfirmDialogComponent, {
-      data: { title: 'Delete Recurring', message: 'Delete this recurring transaction?' }
-    });
-
-    ref.afterClosed().subscribe((confirmed: boolean) => {
-      if (!confirmed) {
-        return;
-      }
-
-      this.recurringService.deleteRecurring(item.id).subscribe(() => {
-        this.snackBar.open('Recurring transaction deleted', 'Close', { duration: 2500 });
-        this.loadData();
-      });
+      this.subCategories.set(categories.flatMap((category) => category.subCategories));
     });
   }
 }

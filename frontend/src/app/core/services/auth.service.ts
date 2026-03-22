@@ -3,12 +3,15 @@ import { HttpClient } from '@angular/common/http';
 import { Observable, tap } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { AuthResponse, AuthUser, LoginRequest, RegisterRequest } from '../models/auth.model';
+import { UserDetails } from '../models/user.model';
 import { TokenStorageService } from './token-storage.service';
+import { I18nService } from './i18n.service';
 
 @Injectable({ providedIn: 'root' })
 export class AuthService {
   private readonly http = inject(HttpClient);
   private readonly tokenStorage = inject(TokenStorageService);
+  private readonly i18nService = inject(I18nService);
   private readonly baseUrl = `${environment.apiBaseUrl}/auth`;
   private readonly currentUserSignal = signal<AuthUser | null>(this.tokenStorage.getAuth());
 
@@ -22,12 +25,8 @@ export class AuthService {
     );
   }
 
-  register(payload: RegisterRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.baseUrl}/register`, payload).pipe(
-      tap((response) => {
-        this.setSession(response);
-      })
-    );
+  register(payload: RegisterRequest): Observable<UserDetails> {
+    return this.http.post<UserDetails>(`${this.baseUrl}/register`, payload);
   }
 
   isAuthenticated(): boolean {
@@ -35,18 +34,15 @@ export class AuthService {
   }
 
   logout(): void {
-    this.tokenStorage.clear();
+    this.tokenStorage.clearAuth();
     this.currentUserSignal.set(null);
   }
 
   private setSession(response: AuthResponse): void {
     const authUser: AuthUser = {
-      token: response.token,
-      userId: response.userId,
-      email: response.email,
-      role: response.role
+      ...response,
+      language: this.i18nService.language()
     };
-
     this.tokenStorage.saveAuth(authUser);
     this.currentUserSignal.set(authUser);
   }

@@ -1,12 +1,12 @@
 package ee.kaarel.homebudgetappv2.dto;
 
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import ee.kaarel.homebudgetappv2.model.Role;
+import ee.kaarel.homebudgetappv2.model.UserStatus;
 
-@Getter
-@AllArgsConstructor
-public class UserSummaryDto {
-    private Long id;
-    private String username;
-    private String email;
+public record UserSummaryDto(
+        Long id,
+        String username,
+        Role role,
+        UserStatus status
+) {
 }

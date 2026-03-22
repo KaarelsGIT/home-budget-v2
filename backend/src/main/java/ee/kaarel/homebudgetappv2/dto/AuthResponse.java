@@ -1,14 +1,16 @@
 package ee.kaarel.homebudgetappv2.dto;
 
 import ee.kaarel.homebudgetappv2.model.Role;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import ee.kaarel.homebudgetappv2.model.UserStatus;
 
-@Getter
-@AllArgsConstructor
-public class AuthResponse {
-    private String token;
-    private Long userId;
-    private String email;
-    private Role role;
+import java.util.UUID;
+
+public record AuthResponse(
+        String token,
+        Long userId,
+        String username,
+        Role role,
+        UserStatus status,
+        UUID familyId
+) {
 }

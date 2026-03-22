@@ -1,5 +1,11 @@
 @use '@angular/material' as mat;
 
+:root {
+  --hb-surface: rgba(255, 255, 255, 0.82);
+  --hb-border: rgba(15, 23, 42, 0.08);
+  --hb-shadow: 0 18px 50px rgba(15, 23, 42, 0.12);
+}
+
 html {
   color-scheme: light;
   @include mat.theme(
@@ -18,8 +24,11 @@ html {
 body {
   margin: 0;
   font-family: 'Space Grotesk', sans-serif;
-  background: radial-gradient(circle at top right, #f0f7ff, #f7fbff 40%, #ffffff 75%);
-  color: #223;
+  background:
+    radial-gradient(circle at top right, rgba(249, 115, 22, 0.24), transparent 28%),
+    radial-gradient(circle at left top, rgba(14, 165, 233, 0.18), transparent 32%),
+    linear-gradient(180deg, #fff8eb, #f8fafc 42%, #eff6ff);
+  color: #172033;
 }
 
 .full-width {
@@ -33,4 +42,17 @@ body {
 
 .mat-mdc-form-field {
   width: 100%;
+}
+
+.mat-mdc-card {
+  background: var(--hb-surface) !important;
+  border: 1px solid var(--hb-border);
+  box-shadow: var(--hb-shadow) !important;
+  border-radius: 24px !important;
+  backdrop-filter: blur(10px);
+}
+
+.mat-mdc-raised-button:not(:disabled),
+.mat-mdc-unelevated-button:not(:disabled) {
+  border-radius: 14px !important;
 }

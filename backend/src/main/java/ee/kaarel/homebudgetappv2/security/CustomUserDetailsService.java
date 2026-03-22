@@ -1,6 +1,7 @@
 package ee.kaarel.homebudgetappv2.security;
 
 import ee.kaarel.homebudgetappv2.model.User;
+import ee.kaarel.homebudgetappv2.model.UserStatus;
 import ee.kaarel.homebudgetappv2.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,8 +17,14 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(username)
+        User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
-        return new AuthUserDetails(user.getId(), user.getEmail(), user.getPassword(), user.getRole());
+        return new AuthUserDetails(
+                user.getId(),
+                user.getUsername(),
+                user.getPassword(),
+                user.getRole(),
+                user.getStatus() == UserStatus.APPROVED
+        );
     }
 }

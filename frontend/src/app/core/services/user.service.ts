@@ -2,7 +2,7 @@ import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
-import { UserSummary } from '../models/user.model';
+import { UserDetails, UserSummary } from '../models/user.model';
 
 @Injectable({ providedIn: 'root' })
 export class UserService {
@@ -12,5 +12,9 @@ export class UserService {
 
   getUsers(): Observable<UserSummary[]> {
     return this.http.get<UserSummary[]>(this.baseUrl);
+  }
+
+  approveUser(id: number): Observable<UserDetails> {
+    return this.http.patch<UserDetails>(`${this.baseUrl}/${id}/approve`, {});
   }
 }

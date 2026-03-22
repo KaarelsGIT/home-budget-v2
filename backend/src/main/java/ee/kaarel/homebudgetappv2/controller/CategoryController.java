@@ -1,8 +1,10 @@
 package ee.kaarel.homebudgetappv2.controller;
 
-import ee.kaarel.homebudgetappv2.dto.CategoryDTO;
-import ee.kaarel.homebudgetappv2.dto.CategoryTreeDto;
-import ee.kaarel.homebudgetappv2.model.CategoryType;
+import ee.kaarel.homebudgetappv2.dto.CategoryRequest;
+import ee.kaarel.homebudgetappv2.dto.CategoryResponse;
+import ee.kaarel.homebudgetappv2.dto.SubCategoryRequest;
+import ee.kaarel.homebudgetappv2.dto.SubCategoryResponse;
+import ee.kaarel.homebudgetappv2.model.CategoryGroup;
 import ee.kaarel.homebudgetappv2.service.CategoryService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -12,44 +14,51 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/categories", "/api/categories"})
+@RequestMapping("/categories")
 @RequiredArgsConstructor
 public class CategoryController {
 
     private final CategoryService categoryService;
 
     @GetMapping
-    public ResponseEntity<List<CategoryDTO>> getAll(@RequestParam(required = false) CategoryType type) {
-        if (type == null) {
-            return ResponseEntity.ok(categoryService.getAll());
-        }
-        return ResponseEntity.ok(categoryService.getAllByType(type));
-    }
-
-    @GetMapping("/tree")
-    public ResponseEntity<List<CategoryTreeDto>> getTree(@RequestParam(required = false) CategoryType type) {
-        return ResponseEntity.ok(categoryService.getTree(type));
+    public ResponseEntity<List<CategoryResponse>> getCategories(@RequestParam(required = false) CategoryGroup group) {
+        return ResponseEntity.ok(categoryService.getAll(group));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<CategoryDTO> getById(@PathVariable Long id) {
+    public ResponseEntity<CategoryResponse> getCategory(@PathVariable Long id) {
         return ResponseEntity.ok(categoryService.getById(id));
     }
 
     @PostMapping
-    public ResponseEntity<CategoryDTO> create(@Valid @RequestBody CategoryDTO request,
-                                              @RequestParam(required = false) Long userId) {
-        return ResponseEntity.ok(categoryService.create(request, userId));
+    public ResponseEntity<CategoryResponse> createCategory(@Valid @RequestBody CategoryRequest request) {
+        return ResponseEntity.ok(categoryService.create(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<CategoryDTO> update(@PathVariable Long id, @Valid @RequestBody CategoryDTO request) {
+    public ResponseEntity<CategoryResponse> updateCategory(@PathVariable Long id, @Valid @RequestBody CategoryRequest request) {
         return ResponseEntity.ok(categoryService.update(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public ResponseEntity<Void> deleteCategory(@PathVariable Long id) {
         categoryService.delete(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/subcategories")
+    public ResponseEntity<SubCategoryResponse> createSubCategory(@Valid @RequestBody SubCategoryRequest request) {
+        return ResponseEntity.ok(categoryService.createSubCategory(request));
+    }
+
+    @PutMapping("/subcategories/{id}")
+    public ResponseEntity<SubCategoryResponse> updateSubCategory(@PathVariable Long id, @Valid @RequestBody SubCategoryRequest request) {
+        return ResponseEntity.ok(categoryService.updateSubCategory(id, request));
+    }
+
+    @DeleteMapping("/subcategories/{id}")
+    public ResponseEntity<Void> deleteSubCategory(@PathVariable Long id) {
+        categoryService.deleteSubCategory(id);
         return ResponseEntity.noContent().build();
     }
 }

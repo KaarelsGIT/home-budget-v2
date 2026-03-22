@@ -3,8 +3,10 @@ package ee.kaarel.homebudgetappv2.service;
 import ee.kaarel.homebudgetappv2.dto.AuthResponse;
 import ee.kaarel.homebudgetappv2.dto.LoginRequest;
 import ee.kaarel.homebudgetappv2.dto.RegisterRequest;
+import ee.kaarel.homebudgetappv2.dto.UserDTO;
 import ee.kaarel.homebudgetappv2.model.Role;
 import ee.kaarel.homebudgetappv2.model.User;
+import ee.kaarel.homebudgetappv2.model.UserStatus;
 import ee.kaarel.homebudgetappv2.repository.UserRepository;
 import ee.kaarel.homebudgetappv2.security.AuthUserDetails;
 import ee.kaarel.homebudgetappv2.security.JwtService;
@@ -16,6 +18,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.UUID;
+
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
 
 @Service
@@ -26,50 +30,66 @@ public class AuthService {
     private final PasswordEncoder passwordEncoder;
     private final AuthenticationManager authenticationManager;
     private final JwtService jwtService;
+    private final AccountService accountService;
+    private final LocalizationService localizationService;
 
     @Transactional
-    public AuthResponse register(RegisterRequest request) {
-        if (userRepository.existsByEmail(request.getEmail())) {
-            throw new ResponseStatusException(BAD_REQUEST, "Email already in use");
+    public UserDTO register(RegisterRequest request) {
+        if (userRepository.existsByUsername(request.username().trim().toLowerCase())) {
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.user.usernameTaken"));
         }
 
         User user = new User();
-        user.setEmail(request.getEmail().trim().toLowerCase());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setRole(request.getRole());
+        user.setUsername(request.username().trim().toLowerCase());
+        user.setPassword(passwordEncoder.encode(request.password()));
+        user.setRole(request.role());
+        user.setStatus(UserStatus.PENDING);
 
-        if (request.getRole() == Role.CHILD) {
-            if (request.getParentId() == null) {
-                throw new ResponseStatusException(BAD_REQUEST, "parentId is required for child user");
+        if (request.role() == Role.CHILD) {
+            if (request.parentId() == null) {
+                throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.user.childNeedsParent"));
             }
-
-            User parent = userRepository.findById(request.getParentId())
-                    .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "Parent not found"));
-
+            User parent = userRepository.findById(request.parentId())
+                    .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.user.parentNotFound")));
             if (parent.getRole() != Role.PARENT) {
-                throw new ResponseStatusException(BAD_REQUEST, "Provided parentId does not belong to a parent");
+                throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.user.parentRequired"));
             }
-
             user.setParent(parent);
+            user.setFamilyId(parent.getFamilyId());
+        } else if (request.role() == Role.PARENT) {
+            user.setFamilyId(UUID.randomUUID());
+        } else {
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.user.adminRegisterBlocked"));
         }
 
         User saved = userRepository.save(user);
-        AuthUserDetails authUserDetails = new AuthUserDetails(saved.getId(), saved.getEmail(), saved.getPassword(), saved.getRole());
-        String token = jwtService.generateToken(authUserDetails);
-        return new AuthResponse(token, saved.getId(), saved.getEmail(), saved.getRole());
+        accountService.createDefaultAccountFor(saved);
+        return new UserDTO(
+                saved.getId(),
+                saved.getUsername(),
+                saved.getRole(),
+                saved.getStatus(),
+                saved.getCreatedAt(),
+                saved.getParent() == null ? null : saved.getParent().getId(),
+                saved.getFamilyId()
+        );
     }
 
     public AuthResponse login(LoginRequest request) {
         authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(request.getEmail(), request.getPassword())
+                new UsernamePasswordAuthenticationToken(request.username().trim().toLowerCase(), request.password())
         );
 
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, "Invalid credentials"));
-
-        AuthUserDetails authUserDetails = new AuthUserDetails(user.getId(), user.getEmail(), user.getPassword(), user.getRole());
+        User user = userRepository.findByUsername(request.username().trim().toLowerCase())
+                .orElseThrow(() -> new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.auth.invalidCredentials")));
+        AuthUserDetails authUserDetails = new AuthUserDetails(
+                user.getId(),
+                user.getUsername(),
+                user.getPassword(),
+                user.getRole(),
+                user.getStatus() == UserStatus.APPROVED
+        );
         String token = jwtService.generateToken(authUserDetails);
-
-        return new AuthResponse(token, user.getId(), user.getEmail(), user.getRole());
+        return new AuthResponse(token, user.getId(), user.getUsername(), user.getRole(), user.getStatus(), user.getFamilyId());
     }
 }

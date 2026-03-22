@@ -1,15 +1,26 @@
-export type CategoryType = 'INCOME' | 'EXPENSE';
+export type CategoryGroup = 'FAMILY' | 'CHILD';
+
+export interface SubCategory {
+  id: number;
+  name: string;
+  parentCategoryId: number;
+  parentCategoryName: string;
+}
 
 export interface Category {
   id: number;
   name: string;
-  type: CategoryType;
-  userId: number;
-  parentId?: number | null;
+  group: CategoryGroup;
+  ownerFamilyId: string;
+  subCategories: SubCategory[];
 }
 
 export interface CategoryRequest {
   name: string;
-  type: CategoryType;
-  parentId?: number | null;
+  group: CategoryGroup;
+}
+
+export interface SubCategoryRequest {
+  name: string;
+  parentCategoryId: number;
 }

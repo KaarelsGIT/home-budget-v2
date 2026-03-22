@@ -1,12 +1,15 @@
-import { Component, computed, signal } from '@angular/core';
+import { Component, computed, inject } from '@angular/core';
 import { Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
-import { MatToolbarModule } from '@angular/material/toolbar';
-import { MatSidenavModule } from '@angular/material/sidenav';
-import { MatListModule } from '@angular/material/list';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
-import { BreakpointObserver } from '@angular/cdk/layout';
+import { MatListModule } from '@angular/material/list';
+import { MatSelectModule } from '@angular/material/select';
+import { MatSidenavModule } from '@angular/material/sidenav';
+import { MatToolbarModule } from '@angular/material/toolbar';
 import { AuthService } from '../../core/services/auth.service';
+import { I18nService } from '../../core/services/i18n.service';
+import { I18nPipe } from '../pipes/i18n.pipe';
+import { LanguageCode } from '../../core/models/auth.model';
 
 @Component({
   selector: 'app-layout-shell',
@@ -19,61 +22,46 @@ import { AuthService } from '../../core/services/auth.service';
     MatSidenavModule,
     MatListModule,
     MatButtonModule,
-    MatIconModule
+    MatIconModule,
+    MatSelectModule,
+    I18nPipe
   ],
   styles: `
-    .shell {
-      height: 100vh;
-    }
-
-    .toolbar {
-      position: sticky;
-      top: 0;
-      z-index: 20;
-      display: flex;
-      justify-content: space-between;
-      gap: 16px;
-    }
-
-    .content {
-      padding: 20px;
-      max-width: 1200px;
-      margin: 0 auto;
-    }
-
-    .active-link {
-      background: #d8ecff;
-      border-radius: 12px;
-    }
-
-    .title {
-      font-weight: 700;
-      letter-spacing: 0.02em;
-    }
-
-    @media (max-width: 768px) {
-      .content {
-        padding: 12px;
-      }
-    }
+    .shell { min-height: 100vh; background: radial-gradient(circle at top, #fef3c7, #f8fafc 42%, #e2e8f0); }
+    .toolbar { position: sticky; top: 0; z-index: 20; display: flex; gap: 16px; justify-content: space-between; background: #111827; color: #fff; }
+    .brand { font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+    .sidebar { width: 260px; padding: 16px 12px; background: linear-gradient(180deg, #fff7ed, #ffffff); border-right: 1px solid #e5e7eb; }
+    .content { padding: 24px; max-width: 1280px; margin: 0 auto; }
+    .nav-link { border-radius: 16px; margin-bottom: 6px; }
+    .active { background: #f59e0b20; color: #92400e; }
+    .toolbar-actions { display: flex; align-items: center; gap: 12px; }
+    .user-chip { font-size: 0.95rem; opacity: 0.85; }
+    @media (max-width: 900px) { .content { padding: 16px; } .sidebar { width: 220px; } }
   `,
   template: `
-    <mat-toolbar color="primary" class="toolbar">
-      <span class="title">Home Budget</span>
-      <span>{{ userEmail() }}</span>
-      <button mat-flat-button color="accent" (click)="logout()">Logout</button>
-    </mat-toolbar>
-
     <mat-sidenav-container class="shell">
-      <mat-sidenav [mode]="isMobile() ? 'over' : 'side'" [opened]="!isMobile()">
+      <mat-sidenav opened mode="side" class="sidebar">
+        <div class="brand">{{ 'appName' | i18n }}</div>
         <mat-nav-list>
           @for (item of navItems(); track item.path) {
-            <a mat-list-item [routerLink]="item.path" routerLinkActive="active-link">{{ item.label }}</a>
+            <a mat-list-item class="nav-link" [routerLink]="item.path" routerLinkActive="active">{{ item.label | i18n }}</a>
           }
         </mat-nav-list>
       </mat-sidenav>
 
       <mat-sidenav-content>
+        <mat-toolbar class="toolbar">
+          <span>{{ 'appName' | i18n }}</span>
+          <div class="toolbar-actions">
+            <span class="user-chip">{{ authService.currentUser()?.username }}</span>
+            <mat-select [value]="i18nService.language()" (valueChange)="changeLanguage($event)">
+              @for (language of i18nService.languages; track language) {
+                <mat-option [value]="language">{{ language.toUpperCase() }}</mat-option>
+              }
+            </mat-select>
+            <button mat-flat-button (click)="logout()">{{ 'common.logout' | i18n }}</button>
+          </div>
+        </mat-toolbar>
         <main class="content">
           <router-outlet />
         </main>
@@ -82,39 +70,32 @@ import { AuthService } from '../../core/services/auth.service';
   `
 })
 export class LayoutShellComponent {
+  readonly authService = inject(AuthService);
+  readonly i18nService = inject(I18nService);
+  private readonly router = inject(Router);
+
   readonly navItems = computed(() => {
+    const role = this.authService.currentUser()?.role;
     const items = [
-      { path: '/dashboard', label: 'Dashboard' },
-      { path: '/accounts', label: 'Accounts' },
-      { path: '/transactions', label: 'Transactions' },
-      { path: '/categories', label: 'Categories' },
-      { path: '/recurring', label: 'Recurring' },
-      { path: '/notifications', label: 'Notifications' }
+      { path: '/dashboard', label: 'nav.dashboard' },
+      { path: '/accounts', label: 'nav.accounts' },
+      { path: '/transactions', label: 'nav.transactions' },
+      { path: '/categories', label: 'nav.categories' },
+      { path: '/recurring', label: 'nav.recurring' },
+      { path: '/stats', label: 'nav.stats' }
     ];
-
-    if (this.authService.currentUser()?.role === 'PARENT') {
-      items.push({ path: '/overview', label: 'Family Overview' });
+    if (role === 'ADMIN') {
+      items.push({ path: '/users', label: 'nav.users' });
     }
-
     return items;
   });
 
-  private readonly isMobileSignal = signal(false);
-  readonly isMobile = this.isMobileSignal.asReadonly();
-  readonly userEmail = computed(() => this.authService.currentUser()?.email ?? '');
-
-  constructor(
-    private readonly authService: AuthService,
-    private readonly router: Router,
-    breakpointObserver: BreakpointObserver
-  ) {
-    breakpointObserver.observe('(max-width: 768px)').subscribe((state) => {
-      this.isMobileSignal.set(state.matches);
-    });
+  async changeLanguage(language: LanguageCode): Promise<void> {
+    await this.i18nService.setLanguage(language);
   }
 
   logout(): void {
     this.authService.logout();
-    this.router.navigate(['/auth/login']);
+    void this.router.navigate(['/auth/login']);
   }
 }

@@ -1,18 +1,15 @@
 package ee.kaarel.homebudgetappv2.dto;
 
-import ee.kaarel.homebudgetappv2.model.AccountType;
-import lombok.Getter;
-import lombok.Setter;
-
 import java.math.BigDecimal;
+import java.util.List;
 
-@Getter
-@Setter
-public class AccountResponse {
-    private Long id;
-    private String name;
-    private BigDecimal balance;
-    private AccountType type;
-    private Long userId;
-    private Long parentAccountId;
+public record AccountResponse(
+        Long id,
+        String name,
+        Long ownerId,
+        String ownerUsername,
+        boolean isDefault,
+        BigDecimal balance,
+        List<AccountMemberResponse> members
+) {
 }

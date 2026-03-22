@@ -3,9 +3,12 @@ package ee.kaarel.homebudgetappv2.model;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Entity
 @Table(name = "categories")
@@ -21,17 +24,13 @@ public class Category {
     private String name;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private CategoryType type;
+    @JdbcTypeCode(SqlTypes.VARCHAR)
+    @Column(name = "category_group", nullable = false, length = 32)
+    private CategoryGroup group;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "parent_id")
-    private Category parent;
+    @Column(nullable = false, columnDefinition = "BINARY(16)")
+    private UUID ownerFamilyId;
 
-    @OneToMany(mappedBy = "parent")
-    private List<Category> children = new ArrayList<>();
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+    @OneToMany(mappedBy = "parentCategory", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<SubCategory> subCategories = new ArrayList<>();
 }

@@ -1,17 +1,23 @@
-export type AccountType = 'PERSONAL' | 'SHARED';
+export type AccountMemberRole = 'OWNER' | 'MEMBER' | 'VIEWER';
+
+export interface AccountMember {
+  userId: number;
+  username: string;
+  role: AccountMemberRole;
+}
 
 export interface Account {
   id: number;
   name: string;
+  ownerId: number;
+  ownerUsername: string;
+  isDefault: boolean;
   balance: number;
-  type: AccountType;
-  userId: number;
-  parentAccountId?: number | null;
+  members: AccountMember[];
 }
 
 export interface AccountRequest {
   name: string;
-  balance: number;
-  type: AccountType;
-  parentAccountId?: number | null;
+  isDefault: boolean;
+  ownerId?: number | null;
 }

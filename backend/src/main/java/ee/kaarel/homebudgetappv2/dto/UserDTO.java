@@ -1,14 +1,18 @@
 package ee.kaarel.homebudgetappv2.dto;
 
 import ee.kaarel.homebudgetappv2.model.Role;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
+import ee.kaarel.homebudgetappv2.model.UserStatus;
 
-@Getter
-@AllArgsConstructor
-public class UserDTO {
-    private Long id;
-    private String email;
-    private Role role;
-    private Long parentId;
+import java.time.LocalDateTime;
+import java.util.UUID;
+
+public record UserDTO(
+        Long id,
+        String username,
+        Role role,
+        UserStatus status,
+        LocalDateTime createdAt,
+        Long parentId,
+        UUID familyId
+) {
 }

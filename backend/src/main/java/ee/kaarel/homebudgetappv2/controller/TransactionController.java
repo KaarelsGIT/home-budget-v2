@@ -1,7 +1,9 @@
 package ee.kaarel.homebudgetappv2.controller;
 
+import ee.kaarel.homebudgetappv2.dto.CreateTransactionRequest;
 import ee.kaarel.homebudgetappv2.dto.TransactionDTO;
-import ee.kaarel.homebudgetappv2.dto.TransactionRequest;
+import ee.kaarel.homebudgetappv2.dto.TransactionFilterRequest;
+import ee.kaarel.homebudgetappv2.dto.TransferRequest;
 import ee.kaarel.homebudgetappv2.model.TransactionType;
 import ee.kaarel.homebudgetappv2.service.TransactionService;
 import jakarta.validation.Valid;
@@ -14,49 +16,55 @@ import java.time.LocalDate;
 import java.util.List;
 
 @RestController
-@RequestMapping({"/transactions", "/api/transactions"})
+@RequestMapping("/transactions")
 @RequiredArgsConstructor
 public class TransactionController {
 
     private final TransactionService transactionService;
 
     @GetMapping
-    public ResponseEntity<List<TransactionDTO>> getAll() {
-        return ResponseEntity.ok(transactionService.getAll());
+    public ResponseEntity<List<TransactionDTO>> getTransactions(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
+            @RequestParam(required = false) Long subCategoryId,
+            @RequestParam(required = false) TransactionType type,
+            @RequestParam(required = false) Long accountId,
+            @RequestParam(required = false) Long userId
+    ) {
+        return ResponseEntity.ok(transactionService.getAll(
+                new TransactionFilterRequest(startDate, endDate, subCategoryId, type, accountId, userId)
+        ));
     }
 
     @GetMapping("/{id}")
-    public ResponseEntity<TransactionDTO> getById(@PathVariable Long id) {
+    public ResponseEntity<TransactionDTO> getTransaction(@PathVariable Long id) {
         return ResponseEntity.ok(transactionService.getById(id));
     }
 
     @PostMapping
-    public ResponseEntity<TransactionDTO> create(@Valid @RequestBody TransactionRequest request,
-                                                 @RequestParam(required = false) Long userId) {
-        return ResponseEntity.ok(transactionService.create(request, userId));
+    public ResponseEntity<TransactionDTO> createTransaction(@Valid @RequestBody CreateTransactionRequest request) {
+        return ResponseEntity.ok(transactionService.createTransaction(request));
     }
 
     @PutMapping("/{id}")
-    public ResponseEntity<TransactionDTO> update(@PathVariable Long id, @Valid @RequestBody TransactionRequest request) {
-        return ResponseEntity.ok(transactionService.update(id, request));
+    public ResponseEntity<TransactionDTO> updateTransaction(@PathVariable Long id, @Valid @RequestBody CreateTransactionRequest request) {
+        return ResponseEntity.ok(transactionService.updateTransaction(id, request));
     }
 
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
-        transactionService.delete(id);
+    public ResponseEntity<Void> deleteTransaction(@PathVariable Long id) {
+        transactionService.deleteTransaction(id);
         return ResponseEntity.noContent().build();
     }
 
-    @GetMapping("/filter")
-    public ResponseEntity<List<TransactionDTO>> filter(
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate endDate,
-            @RequestParam(required = false) Long categoryId,
-            @RequestParam(required = false) TransactionType type,
-            @RequestParam(required = false) Long accountId,
-            @RequestParam(defaultValue = "createdAt") String sortBy,
-            @RequestParam(defaultValue = "DESC") String direction
-    ) {
-        return ResponseEntity.ok(transactionService.filter(startDate, endDate, categoryId, type, accountId, sortBy, direction));
+    @PostMapping("/transfer")
+    public ResponseEntity<TransactionDTO> createTransfer(@Valid @RequestBody TransferRequest request) {
+        return ResponseEntity.ok(transactionService.createTransaction(new CreateTransactionRequest(
+                TransactionType.TRANSFER,
+                request.amount(),
+                request.fromAccountId(),
+                request.toAccountId(),
+                request.subCategoryId()
+        )));
     }
 }

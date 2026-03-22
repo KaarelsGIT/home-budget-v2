@@ -1,7 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { guestGuard } from './core/guards/guest.guard';
-import { parentGuard } from './core/guards/parent.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const routes: Routes = [
   {
@@ -44,14 +44,13 @@ export const routes: Routes = [
         loadComponent: () => import('./features/recurring/recurring.component').then((m) => m.RecurringComponent)
       },
       {
-        path: 'notifications',
-        loadComponent: () =>
-          import('./features/notifications/notifications.component').then((m) => m.NotificationsComponent)
+        path: 'stats',
+        loadComponent: () => import('./features/stats/stats.component').then((m) => m.StatsComponent)
       },
       {
-        path: 'overview',
-        canActivate: [parentGuard],
-        loadComponent: () => import('./features/overview/overview.component').then((m) => m.OverviewComponent)
+        path: 'users',
+        canActivate: [adminGuard],
+        loadComponent: () => import('./features/users/users.component').then((m) => m.UsersComponent)
       },
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' }
     ]

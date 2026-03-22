@@ -1,27 +1,28 @@
-export type UserRole = 'PARENT' | 'CHILD';
+export type UserRole = 'ADMIN' | 'PARENT' | 'CHILD';
+export type UserStatus = 'PENDING' | 'APPROVED';
+export type LanguageCode = 'en' | 'et' | 'fi';
 
 export interface LoginRequest {
-  email: string;
+  username: string;
   password: string;
 }
 
 export interface RegisterRequest {
-  email: string;
+  username: string;
   password: string;
-  role: UserRole;
+  role: Exclude<UserRole, 'ADMIN'>;
   parentId?: number | null;
 }
 
 export interface AuthResponse {
   token: string;
   userId: number;
-  email: string;
+  username: string;
   role: UserRole;
+  status: UserStatus;
+  familyId: string;
 }
 
-export interface AuthUser {
-  token: string;
-  userId: number;
-  email: string;
-  role: UserRole;
+export interface AuthUser extends AuthResponse {
+  language: LanguageCode;
 }

@@ -1,24 +1,23 @@
 package ee.kaarel.homebudgetappv2.service;
 
-import ee.kaarel.homebudgetappv2.dto.TransactionRequest;
+import ee.kaarel.homebudgetappv2.dto.CreateTransactionRequest;
 import ee.kaarel.homebudgetappv2.dto.TransactionDTO;
-import ee.kaarel.homebudgetappv2.dto.TransferRequest;
-import ee.kaarel.homebudgetappv2.mapper.TransactionMapper;
+import ee.kaarel.homebudgetappv2.dto.TransactionFilterRequest;
 import ee.kaarel.homebudgetappv2.model.Account;
-import ee.kaarel.homebudgetappv2.model.Category;
+import ee.kaarel.homebudgetappv2.model.SubCategory;
 import ee.kaarel.homebudgetappv2.model.Transaction;
 import ee.kaarel.homebudgetappv2.model.TransactionType;
 import ee.kaarel.homebudgetappv2.model.User;
 import ee.kaarel.homebudgetappv2.repository.TransactionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Sort;
-import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 import static org.springframework.http.HttpStatus.BAD_REQUEST;
@@ -33,209 +32,186 @@ public class TransactionService {
     private final AccountService accountService;
     private final CategoryService categoryService;
     private final UserAccessService userAccessService;
-    private final TransactionMapper transactionMapper;
+    private final LocalizationService localizationService;
 
     @Transactional(readOnly = true)
-    public List<TransactionDTO> getAll() {
-        Specification<Transaction> spec = TransactionSpecifications.userIdIn(userAccessService.getAccessibleUserIds());
-        return transactionRepository.findAll(spec, Sort.by(Sort.Direction.DESC, "createdAt"))
-                .stream()
-                .map(transactionMapper::toDto)
+    public List<TransactionDTO> getAll(TransactionFilterRequest filter) {
+        return getScopedTransactions(filter).stream()
+                .filter(transaction -> filter.type() == null || transaction.getType() == filter.type())
+                .filter(transaction -> filter.subCategoryId() == null
+                        || (transaction.getCategory() != null && transaction.getCategory().getId().equals(filter.subCategoryId())))
+                .filter(transaction -> filter.accountId() == null || usesAccount(transaction, filter.accountId()))
+                .map(this::toDto)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<Transaction> getScopedTransactions(TransactionFilterRequest filter) {
+        User current = userAccessService.getCurrentUser();
+        Sort sort = Sort.by(Sort.Direction.DESC, "createdAt");
+        return resolveScopedTransactions(filter, current, sort);
     }
 
     @Transactional(readOnly = true)
     public TransactionDTO getById(Long id) {
-        Transaction transaction = transactionRepository.findByIdAndUserIdIn(id, userAccessService.getAccessibleUserIds())
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Transaction not found"));
-        return transactionMapper.toDto(transaction);
+        return toDto(getAccessibleTransaction(id));
     }
 
     @Transactional
-    public TransactionDTO create(TransactionRequest request, Long userId) {
-        User targetUser = userAccessService.resolveTargetUser(userId);
-
+    public TransactionDTO createTransaction(CreateTransactionRequest request) {
+        User current = userAccessService.getCurrentUser();
         Transaction transaction = new Transaction();
-        transaction.setUser(targetUser);
-        applyRequestToTransaction(transaction, request, targetUser);
-
-        Transaction saved = transactionRepository.save(transaction);
-        return transactionMapper.toDto(saved);
+        transaction.setCreatedBy(current);
+        applyRequest(transaction, request, null);
+        return toDto(transactionRepository.save(transaction));
     }
 
     @Transactional
-    public TransactionDTO update(Long id, TransactionRequest request) {
-        Transaction existing = transactionRepository.findByIdAndUserIdIn(id, userAccessService.getAccessibleUserIds())
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Transaction not found"));
-
-        rollbackBalanceImpact(existing);
-        applyRequestToTransaction(existing, request, existing.getUser());
-
-        Transaction saved = transactionRepository.save(existing);
-        return transactionMapper.toDto(saved);
+    public TransactionDTO updateTransaction(Long id, CreateTransactionRequest request) {
+        Transaction transaction = getAccessibleTransaction(id);
+        applyRequest(transaction, request, transaction.getId());
+        return toDto(transactionRepository.save(transaction));
     }
 
     @Transactional
-    public TransactionDTO transfer(TransferRequest request) {
-        Transaction transaction = new Transaction();
-        transaction.setUser(userAccessService.getCurrentUser());
-
-        applyTransfer(transaction, request.getAmount(), request.getFromAccountId(), request.getToAccountId(), true);
-
-        Transaction saved = transactionRepository.save(transaction);
-        return transactionMapper.toDto(saved);
+    public void deleteTransaction(Long id) {
+        transactionRepository.delete(getAccessibleTransaction(id));
     }
 
-    @Transactional
-    public void delete(Long id) {
-        Transaction transaction = transactionRepository.findByIdAndUserIdIn(id, userAccessService.getAccessibleUserIds())
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Transaction not found"));
-
-        rollbackBalanceImpact(transaction);
-        transactionRepository.delete(transaction);
+    private List<Transaction> resolveScopedTransactions(TransactionFilterRequest filter, User current, Sort sort) {
+        if (filter.startDate() != null || filter.endDate() != null) {
+            LocalDateTime start = filter.startDate() == null
+                    ? LocalDateTime.of(1970, 1, 1, 0, 0)
+                    : filter.startDate().atStartOfDay();
+            LocalDateTime end = filter.endDate() == null
+                    ? LocalDateTime.now().with(LocalTime.MAX)
+                    : filter.endDate().atTime(LocalTime.MAX);
+            if (userAccessService.isAdmin(current)) {
+                return transactionRepository.findAll().stream()
+                        .filter(t -> !t.getCreatedAt().isBefore(start) && !t.getCreatedAt().isAfter(end))
+                        .toList();
+            }
+            if (userAccessService.isChild(current)) {
+                return transactionRepository.findAllByOwnerIdAndCreatedAtBetween(current.getId(), start, end, sort);
+            }
+            if (filter.userId() != null) {
+                User scopedUser = userAccessService.getAccessibleUserOrThrow(filter.userId());
+                return transactionRepository.findAllByOwnerIdAndCreatedAtBetween(scopedUser.getId(), start, end, sort);
+            }
+            return transactionRepository.findAllByFamilyIdAndCreatedAtBetween(current.getFamilyId(), start, end, sort);
+        }
+        if (userAccessService.isAdmin(current)) {
+            return transactionRepository.findAll(sort);
+        }
+        if (userAccessService.isChild(current)) {
+            return transactionRepository.findAllByOwnerId(current.getId(), sort);
+        }
+        if (filter.userId() != null) {
+            User scopedUser = userAccessService.getAccessibleUserOrThrow(filter.userId());
+            return transactionRepository.findAllByOwnerId(scopedUser.getId(), sort);
+        }
+        return transactionRepository.findAllByFamilyId(current.getFamilyId(), sort);
     }
 
-    @Transactional(readOnly = true)
-    public List<TransactionDTO> filter(LocalDate startDate,
-                                       LocalDate endDate,
-                                       Long categoryId,
-                                       TransactionType type,
-                                       Long accountId,
-                                       String sortBy,
-                                       String direction) {
-        String sortField = resolveSortField(sortBy);
-        Sort.Direction sortDirection = "ASC".equalsIgnoreCase(direction) ? Sort.Direction.ASC : Sort.Direction.DESC;
-
-        Specification<Transaction> spec = Specification.where(TransactionSpecifications.userIdIn(userAccessService.getAccessibleUserIds()))
-                .and(TransactionSpecifications.dateFrom(startDate))
-                .and(TransactionSpecifications.dateTo(endDate))
-                .and(TransactionSpecifications.category(categoryId))
-                .and(TransactionSpecifications.type(type))
-                .and(TransactionSpecifications.account(accountId));
-
-        return transactionRepository.findAll(spec, Sort.by(sortDirection, sortField))
-                .stream()
-                .map(transactionMapper::toDto)
-                .toList();
+    private boolean usesAccount(Transaction transaction, Long accountId) {
+        return (transaction.getFromAccount() != null && transaction.getFromAccount().getId().equals(accountId))
+                || (transaction.getToAccount() != null && transaction.getToAccount().getId().equals(accountId));
     }
 
-    private void applyRequestToTransaction(Transaction transaction, TransactionRequest request, User owner) {
-        validateTypeRules(request);
-
-        Category category = request.getCategoryId() == null ? null : categoryService.getAccessibleCategoryOrThrow(request.getCategoryId());
-        if (category != null && !category.getUser().getId().equals(owner.getId())) {
-            throw new ResponseStatusException(BAD_REQUEST, "Category must belong to transaction owner");
+    private void applyRequest(Transaction transaction, CreateTransactionRequest request, Long transactionIdToExclude) {
+        if (request.amount().compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.transaction.amount"));
         }
 
-        if (request.getType() != TransactionType.TRANSFER && category == null) {
-            throw new ResponseStatusException(BAD_REQUEST, "Category is required for INCOME and EXPENSE");
-        }
+        transaction.setAmount(request.amount());
+        transaction.setType(request.type());
 
-        if (request.getType() == TransactionType.TRANSFER && category != null) {
-            throw new ResponseStatusException(BAD_REQUEST, "Category must be null for TRANSFER");
-        }
+        SubCategory subCategory = request.subCategoryId() == null ? null : categoryService.getAccessibleSubCategory(request.subCategoryId());
+        transaction.setCategory(subCategory);
 
-        transaction.setCategory(category);
-        transaction.setAmount(request.getAmount());
-
-        switch (request.getType()) {
-            case INCOME -> applyIncome(transaction, request.getAmount(), request.getToAccountId());
-            case EXPENSE -> applyExpense(transaction, request.getAmount(), request.getFromAccountId());
-            case TRANSFER -> applyTransfer(transaction, request.getAmount(), request.getFromAccountId(), request.getToAccountId(), true);
+        switch (request.type()) {
+            case INCOME -> applyIncome(transaction, request);
+            case EXPENSE -> applyExpense(transaction, request, transactionIdToExclude);
+            case TRANSFER -> applyTransfer(transaction, request, transactionIdToExclude);
         }
     }
 
-    private void applyIncome(Transaction transaction, BigDecimal amount, Long toAccountId) {
-        Account toAccount = accountService.getAccessibleAccountOrThrow(toAccountId);
-        transaction.setType(TransactionType.INCOME);
+    private void applyIncome(Transaction transaction, CreateTransactionRequest request) {
+        if (request.toAccountId() == null || request.fromAccountId() != null) {
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.transaction.incomeShape"));
+        }
         transaction.setFromAccount(null);
-        transaction.setToAccount(toAccount);
-        toAccount.setBalance(toAccount.getBalance().add(amount));
+        transaction.setToAccount(accountService.getAccessibleAccountOrThrow(request.toAccountId()));
     }
 
-    private void applyExpense(Transaction transaction, BigDecimal amount, Long fromAccountId) {
-        Account fromAccount = accountService.getAccessibleAccountOrThrow(fromAccountId);
-        ensureSufficientBalance(fromAccount, amount);
-        transaction.setType(TransactionType.EXPENSE);
-        transaction.setCategory(transaction.getCategory());
+    private void applyExpense(Transaction transaction, CreateTransactionRequest request, Long excludeId) {
+        if (request.fromAccountId() == null || request.toAccountId() != null) {
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.transaction.expenseShape"));
+        }
+        Account fromAccount = accountService.getAccessibleAccountOrThrow(request.fromAccountId());
+        ensureCanSpend(fromAccount, request.amount(), excludeId);
         transaction.setFromAccount(fromAccount);
         transaction.setToAccount(null);
-        fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
     }
 
-    private void applyTransfer(Transaction transaction,
-                               BigDecimal amount,
-                               Long fromAccountId,
-                               Long toAccountId,
-                               boolean requireOwnedSource) {
-        Account fromAccount = requireOwnedSource
-                ? accountService.getOwnedAccountOrThrow(fromAccountId)
-                : accountService.getAccessibleAccountOrThrow(fromAccountId);
-        Account toAccount = accountService.getAccessibleAccountOrThrow(toAccountId);
-
+    private void applyTransfer(Transaction transaction, CreateTransactionRequest request, Long excludeId) {
+        if (request.fromAccountId() == null || request.toAccountId() == null) {
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.transaction.transferShape"));
+        }
+        Account fromAccount = accountService.getAccessibleAccountOrThrow(request.fromAccountId());
+        Account toAccount = accountService.getAccessibleAccountOrThrow(request.toAccountId());
         if (fromAccount.getId().equals(toAccount.getId())) {
-            throw new ResponseStatusException(BAD_REQUEST, "Transfer accounts must be different");
+            throw new ResponseStatusException(BAD_REQUEST, localizationService.getMessage("error.transaction.transferSameAccount"));
         }
-        if (requireOwnedSource && !fromAccount.getUser().getId().equals(userAccessService.getCurrentUser().getId())) {
-            throw new ResponseStatusException(BAD_REQUEST, "Source account must belong to the current user");
+        if (!fromAccount.getOwner().getFamilyId().equals(toAccount.getOwner().getFamilyId())) {
+            throw new ResponseStatusException(FORBIDDEN, localizationService.getMessage("error.family.accessDenied"));
         }
-
-        ensureSufficientBalance(fromAccount, amount);
-
-        transaction.setType(TransactionType.TRANSFER);
-        transaction.setCategory(null);
+        ensureCanSpend(fromAccount, request.amount(), excludeId);
         transaction.setFromAccount(fromAccount);
         transaction.setToAccount(toAccount);
-
-        fromAccount.setBalance(fromAccount.getBalance().subtract(amount));
-        toAccount.setBalance(toAccount.getBalance().add(amount));
+        transaction.setCategory(request.subCategoryId() == null ? null : categoryService.getAccessibleSubCategory(request.subCategoryId()));
     }
 
-    private void validateTypeRules(TransactionRequest request) {
-        TransactionType type = request.getType();
-
-        switch (type) {
-            case INCOME -> {
-                if (request.getToAccountId() == null || request.getFromAccountId() != null) {
-                    throw new ResponseStatusException(BAD_REQUEST, "INCOME requires toAccount and no fromAccount");
-                }
-            }
-            case EXPENSE -> {
-                if (request.getFromAccountId() == null || request.getToAccountId() != null) {
-                    throw new ResponseStatusException(BAD_REQUEST, "EXPENSE requires fromAccount and no toAccount");
-                }
-            }
-            case TRANSFER -> {
-                if (request.getFromAccountId() == null || request.getToAccountId() == null) {
-                    throw new ResponseStatusException(BAD_REQUEST, "TRANSFER requires both fromAccount and toAccount");
-                }
-            }
+    private void ensureCanSpend(Account account, BigDecimal amount, Long excludeId) {
+        BigDecimal balance = excludeId == null
+                ? accountService.calculateBalance(account.getId())
+                : accountService.calculateBalanceExcluding(account.getId(), excludeId);
+        if (balance.compareTo(amount) < 0) {
+            throw new ResponseStatusException(FORBIDDEN, localizationService.getMessage("error.account.insufficientBalance"));
         }
     }
 
-    private void rollbackBalanceImpact(Transaction transaction) {
-        BigDecimal amount = transaction.getAmount();
-
-        switch (transaction.getType()) {
-            case INCOME -> transaction.getToAccount().setBalance(transaction.getToAccount().getBalance().subtract(amount));
-            case EXPENSE -> transaction.getFromAccount().setBalance(transaction.getFromAccount().getBalance().add(amount));
-            case TRANSFER -> {
-                transaction.getFromAccount().setBalance(transaction.getFromAccount().getBalance().add(amount));
-                transaction.getToAccount().setBalance(transaction.getToAccount().getBalance().subtract(amount));
-            }
+    private Transaction getAccessibleTransaction(Long id) {
+        User current = userAccessService.getCurrentUser();
+        Transaction transaction = userAccessService.isAdmin(current)
+                ? transactionRepository.findById(id)
+                    .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, localizationService.getMessage("error.transaction.notFound")))
+                : userAccessService.isChild(current)
+                    ? transactionRepository.findByIdAndOwnerId(id, current.getId())
+                        .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, localizationService.getMessage("error.transaction.notFound")))
+                    : transactionRepository.findByIdAndFamilyId(id, current.getFamilyId())
+                        .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, localizationService.getMessage("error.transaction.notFound")));
+        if (!userAccessService.canAccessTransaction(current, transaction)) {
+            throw new ResponseStatusException(FORBIDDEN, localizationService.getMessage("error.transaction.accessDenied"));
         }
+        return transaction;
     }
 
-    private void ensureSufficientBalance(Account account, BigDecimal amount) {
-        if (account.getBalance().compareTo(amount) < 0) {
-            throw new ResponseStatusException(FORBIDDEN, "Insufficient balance");
-        }
-    }
-
-    private String resolveSortField(String sortBy) {
-        if ("amount".equalsIgnoreCase(sortBy)) {
-            return "amount";
-        }
-        return "createdAt";
+    private TransactionDTO toDto(Transaction transaction) {
+        return new TransactionDTO(
+                transaction.getId(),
+                transaction.getAmount(),
+                transaction.getType(),
+                transaction.getFromAccount() == null ? null : transaction.getFromAccount().getId(),
+                transaction.getFromAccount() == null ? null : transaction.getFromAccount().getName(),
+                transaction.getToAccount() == null ? null : transaction.getToAccount().getId(),
+                transaction.getToAccount() == null ? null : transaction.getToAccount().getName(),
+                transaction.getCategory() == null ? null : transaction.getCategory().getId(),
+                transaction.getCategory() == null ? null : transaction.getCategory().getName(),
+                transaction.getCategory() == null ? null : transaction.getCategory().getParentCategory().getName(),
+                transaction.getCreatedAt(),
+                transaction.getCreatedBy().getId(),
+                transaction.getCreatedBy().getUsername()
+        );
     }
 }

@@ -1,20 +1,21 @@
 package ee.kaarel.homebudgetappv2.service;
 
-import ee.kaarel.homebudgetappv2.dto.CategoryDTO;
-import ee.kaarel.homebudgetappv2.dto.CategoryTreeDto;
+import ee.kaarel.homebudgetappv2.dto.CategoryRequest;
+import ee.kaarel.homebudgetappv2.dto.CategoryResponse;
+import ee.kaarel.homebudgetappv2.dto.SubCategoryRequest;
+import ee.kaarel.homebudgetappv2.dto.SubCategoryResponse;
 import ee.kaarel.homebudgetappv2.model.Category;
-import ee.kaarel.homebudgetappv2.model.CategoryType;
-import ee.kaarel.homebudgetappv2.model.User;
+import ee.kaarel.homebudgetappv2.model.CategoryGroup;
+import ee.kaarel.homebudgetappv2.model.SubCategory;
 import ee.kaarel.homebudgetappv2.repository.CategoryRepository;
+import ee.kaarel.homebudgetappv2.repository.SubCategoryRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 
-import static org.springframework.http.HttpStatus.BAD_REQUEST;
 import static org.springframework.http.HttpStatus.NOT_FOUND;
 
 @Service
@@ -22,116 +23,96 @@ import static org.springframework.http.HttpStatus.NOT_FOUND;
 public class CategoryService {
 
     private final CategoryRepository categoryRepository;
+    private final SubCategoryRepository subCategoryRepository;
     private final UserAccessService userAccessService;
+    private final LocalizationService localizationService;
 
     @Transactional(readOnly = true)
-    public List<CategoryDTO> getAll() {
-        return categoryRepository.findByUserIdIn(userAccessService.getAccessibleUserIds())
-                .stream()
-                .map(this::toDto)
-                .toList();
+    public List<CategoryResponse> getAll(CategoryGroup group) {
+        var familyId = userAccessService.getCurrentUser().getFamilyId();
+        List<Category> categories = group == null
+                ? categoryRepository.findByOwnerFamilyIdOrderByNameAsc(familyId)
+                : categoryRepository.findByOwnerFamilyIdAndGroupOrderByNameAsc(familyId, group);
+        return categories.stream().map(this::toResponse).toList();
     }
 
     @Transactional(readOnly = true)
-    public List<CategoryDTO> getAllByType(CategoryType type) {
-        return categoryRepository.findByUserIdInAndType(userAccessService.getAccessibleUserIds(), type)
-                .stream()
-                .map(this::toDto)
-                .toList();
-    }
-
-    @Transactional(readOnly = true)
-    public List<CategoryTreeDto> getTree(CategoryType type) {
-        List<Category> categories = type == null
-                ? categoryRepository.findByUserIdIn(userAccessService.getAccessibleUserIds())
-                : categoryRepository.findByUserIdInAndType(userAccessService.getAccessibleUserIds(), type);
-
-        List<Category> roots = categories.stream().filter(c -> c.getParent() == null).toList();
-        return roots.stream().map(c -> toTree(c, categories)).toList();
-    }
-
-    @Transactional(readOnly = true)
-    public CategoryDTO getById(Long id) {
-        Category category = getAccessibleCategoryOrThrow(id);
-        return toDto(category);
+    public CategoryResponse getById(Long id) {
+        return toResponse(getAccessibleCategory(id));
     }
 
     @Transactional
-    public CategoryDTO create(CategoryDTO request, Long userId) {
-        User targetUser = userAccessService.resolveTargetUser(userId);
-
+    public CategoryResponse create(CategoryRequest request) {
         Category category = new Category();
-        category.setName(request.getName());
-        category.setType(request.getType());
-        category.setUser(targetUser);
-
-        if (request.getParentId() != null) {
-            Category parent = getAccessibleCategoryOrThrow(request.getParentId());
-            if (!parent.getUser().getId().equals(targetUser.getId())) {
-                throw new ResponseStatusException(BAD_REQUEST, "Parent category must belong to the same user");
-            }
-            if (parent.getType() != request.getType()) {
-                throw new ResponseStatusException(BAD_REQUEST, "Parent category type must match child category type");
-            }
-            category.setParent(parent);
-        }
-
-        return toDto(categoryRepository.save(category));
+        category.setName(request.name().trim());
+        category.setGroup(request.group());
+        category.setOwnerFamilyId(userAccessService.getCurrentUser().getFamilyId());
+        return toResponse(categoryRepository.save(category));
     }
 
     @Transactional
-    public CategoryDTO update(Long id, CategoryDTO request) {
-        Category category = getAccessibleCategoryOrThrow(id);
-        category.setName(request.getName());
-        category.setType(request.getType());
-
-        if (request.getParentId() != null) {
-            if (request.getParentId().equals(id)) {
-                throw new ResponseStatusException(BAD_REQUEST, "Category cannot be parent of itself");
-            }
-            Category parent = getAccessibleCategoryOrThrow(request.getParentId());
-            if (!parent.getUser().getId().equals(category.getUser().getId())) {
-                throw new ResponseStatusException(BAD_REQUEST, "Parent category must belong to the same user");
-            }
-            if (parent.getType() != request.getType()) {
-                throw new ResponseStatusException(BAD_REQUEST, "Parent category type must match child category type");
-            }
-            category.setParent(parent);
-        } else {
-            category.setParent(null);
-        }
-
-        return toDto(categoryRepository.save(category));
+    public CategoryResponse update(Long id, CategoryRequest request) {
+        Category category = getAccessibleCategory(id);
+        category.setName(request.name().trim());
+        category.setGroup(request.group());
+        return toResponse(categoryRepository.save(category));
     }
 
     @Transactional
     public void delete(Long id) {
-        Category category = getAccessibleCategoryOrThrow(id);
-        categoryRepository.delete(category);
+        categoryRepository.delete(getAccessibleCategory(id));
+    }
+
+    @Transactional
+    public SubCategoryResponse createSubCategory(SubCategoryRequest request) {
+        Category category = getAccessibleCategory(request.parentCategoryId());
+        SubCategory subCategory = new SubCategory();
+        subCategory.setName(request.name().trim());
+        subCategory.setParentCategory(category);
+        return toSubCategoryResponse(subCategoryRepository.save(subCategory));
+    }
+
+    @Transactional
+    public SubCategoryResponse updateSubCategory(Long id, SubCategoryRequest request) {
+        SubCategory subCategory = getAccessibleSubCategory(id);
+        Category category = getAccessibleCategory(request.parentCategoryId());
+        subCategory.setName(request.name().trim());
+        subCategory.setParentCategory(category);
+        return toSubCategoryResponse(subCategoryRepository.save(subCategory));
+    }
+
+    @Transactional
+    public void deleteSubCategory(Long id) {
+        subCategoryRepository.delete(getAccessibleSubCategory(id));
     }
 
     @Transactional(readOnly = true)
-    public Category getAccessibleCategoryOrThrow(Long categoryId) {
-        return categoryRepository.findByIdAndUserIdIn(categoryId, userAccessService.getAccessibleUserIds())
-                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, "Category not found"));
+    public SubCategory getAccessibleSubCategory(Long id) {
+        return subCategoryRepository.findByIdAndParentCategoryOwnerFamilyId(id, userAccessService.getCurrentUser().getFamilyId())
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, localizationService.getMessage("error.subcategory.notFound")));
     }
 
-    private CategoryDTO toDto(Category category) {
-        CategoryDTO dto = new CategoryDTO();
-        dto.setId(category.getId());
-        dto.setName(category.getName());
-        dto.setType(category.getType());
-        dto.setParentId(category.getParent() != null ? category.getParent().getId() : null);
-        dto.setUserId(category.getUser().getId());
-        return dto;
+    private Category getAccessibleCategory(Long id) {
+        return categoryRepository.findByIdAndOwnerFamilyId(id, userAccessService.getCurrentUser().getFamilyId())
+                .orElseThrow(() -> new ResponseStatusException(NOT_FOUND, localizationService.getMessage("error.category.notFound")));
     }
 
-    private CategoryTreeDto toTree(Category category, List<Category> all) {
-        List<CategoryTreeDto> children = new ArrayList<>();
-        all.stream().filter(c -> c.getParent() != null && c.getParent().getId().equals(category.getId()))
-                .forEach(child -> children.add(toTree(child, all)));
+    private CategoryResponse toResponse(Category category) {
+        return new CategoryResponse(
+                category.getId(),
+                category.getName(),
+                category.getGroup(),
+                category.getOwnerFamilyId(),
+                category.getSubCategories().stream().map(this::toSubCategoryResponse).toList()
+        );
+    }
 
-        return new CategoryTreeDto(category.getId(), category.getName(), category.getType(),
-                category.getParent() != null ? category.getParent().getId() : null, children);
+    private SubCategoryResponse toSubCategoryResponse(SubCategory subCategory) {
+        return new SubCategoryResponse(
+                subCategory.getId(),
+                subCategory.getName(),
+                subCategory.getParentCategory().getId(),
+                subCategory.getParentCategory().getName()
+        );
     }
 }
