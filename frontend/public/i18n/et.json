@@ -1,0 +1,45 @@
+{
+  "appName": "Pere eelarve",
+  "nav": {
+    "dashboard": "Avaleht",
+    "accounts": "Kontod",
+    "transactions": "Tehingud",
+    "categories": "Kategooriad",
+    "recurring": "Püsikulud",
+    "stats": "Statistika",
+    "users": "Kasutajad"
+  },
+  "auth": {
+    "login": "Logi sisse",
+    "register": "Registreeri",
+    "username": "Kasutajanimi",
+    "password": "Parool",
+    "role": "Roll",
+    "parent": "Vanem",
+    "child": "Laps",
+    "parentUser": "Vanemkasutaja",
+    "pendingInfo": "Uued kasutajad jäävad ootele kuni admin kinnitab."
+  },
+  "common": {
+    "save": "Salvesta",
+    "create": "Loo",
+    "delete": "🗑",
+    "edit": "✏️",
+    "logout": "Logi välja",
+    "language": "Keel",
+    "amount": "Summa",
+    "year": "Aasta",
+    "month": "Kuu",
+    "all": "Kõik",
+    "owner": "Omanik",
+    "name": "Nimi",
+    "type": "Tüüp",
+    "actions": "Tegevused",
+    "confirm": "Kinnita",
+    "cancel": "Tühista",
+    "pay": "Maksa",
+    "active": "Aktiivne",
+    "dueDay": "Tähtaeg",
+    "noData": "Andmed puuduvad"
+  }
+}

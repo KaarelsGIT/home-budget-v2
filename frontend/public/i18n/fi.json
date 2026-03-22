@@ -1,0 +1,45 @@
+{
+  "appName": "Perhebudjetti",
+  "nav": {
+    "dashboard": "Etusivu",
+    "accounts": "Tilit",
+    "transactions": "Tapahtumat",
+    "categories": "Kategoriat",
+    "recurring": "Toistuvat",
+    "stats": "Tilastot",
+    "users": "Käyttäjät"
+  },
+  "auth": {
+    "login": "Kirjaudu",
+    "register": "Rekisteröidy",
+    "username": "Käyttäjänimi",
+    "password": "Salasana",
+    "role": "Rooli",
+    "parent": "Vanhempi",
+    "child": "Lapsi",
+    "parentUser": "Vanhempi",
+    "pendingInfo": "Uudet käyttäjät odottavat ylläpitäjän hyväksyntää."
+  },
+  "common": {
+    "save": "Tallenna",
+    "create": "Luo",
+    "delete": "🗑",
+    "edit": "✏️",
+    "logout": "Kirjaudu ulos",
+    "language": "Kieli",
+    "amount": "Summa",
+    "year": "Vuosi",
+    "month": "Kuukausi",
+    "all": "Kaikki",
+    "owner": "Omistaja",
+    "name": "Nimi",
+    "type": "Tyyppi",
+    "actions": "Toiminnot",
+    "confirm": "Vahvista",
+    "cancel": "Peruuta",
+    "pay": "Maksa",
+    "active": "Aktiivinen",
+    "dueDay": "Eräpäivä",
+    "noData": "Ei tietoja"
+  }
+}

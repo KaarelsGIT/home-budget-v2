@@ -1,0 +1,45 @@
+{
+  "appName": "Family Budget",
+  "nav": {
+    "dashboard": "Dashboard",
+    "accounts": "Accounts",
+    "transactions": "Transactions",
+    "categories": "Categories",
+    "recurring": "Recurring",
+    "stats": "Statistics",
+    "users": "Users"
+  },
+  "auth": {
+    "login": "Login",
+    "register": "Register",
+    "username": "Username",
+    "password": "Password",
+    "role": "Role",
+    "parent": "Parent",
+    "child": "Child",
+    "parentUser": "Parent user",
+    "pendingInfo": "New users stay pending until an admin approves them."
+  },
+  "common": {
+    "save": "Save",
+    "create": "Create",
+    "delete": "🗑",
+    "edit": "✏️",
+    "logout": "Logout",
+    "language": "Language",
+    "amount": "Amount",
+    "year": "Year",
+    "month": "Month",
+    "all": "All",
+    "owner": "Owner",
+    "name": "Name",
+    "type": "Type",
+    "actions": "Actions",
+    "confirm": "Confirm",
+    "cancel": "Cancel",
+    "pay": "Pay",
+    "active": "Active",
+    "dueDay": "Due day",
+    "noData": "No data"
+  }
+}
